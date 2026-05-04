@@ -86,8 +86,8 @@ const ROOMS = [
     wallColor:0x1a1a1a, sideColor:0x141414, floorColor:0x111110,
     accent:[0.67,0.6,0.35],
     layout:[
-      {wall:'back', x:-2.5, y:2.2, photo:0},
-      {wall:'back', x:2.5,  y:2.2, photo:1},
+      {wall:'back', x:-4.5, y:2.2, photo:0},
+      {wall:'back', x:4.5,  y:2.2, photo:1},
       {wall:'left', z:-3,   y:2.2, photo:2},
       {wall:'right',z:-3,   y:2.2, photo:3},
     ],
@@ -138,7 +138,7 @@ const ROOMS = [
       {t:'建筑几何',d:'直线与曲线的交响乐',h:180,s:40},
     ]
   },
-  { name:'人间烟火', sub:'Life & Soul', w:11, h:4.5, d:9,
+  { name:'人间烟火', sub:'Life & Soul', w:11, h:5, d:9,
     wallColor:0x201616, sideColor:0x181010, floorColor:0x120c0c,
     accent:[0.67,0.42,0.29],
     layout:[
@@ -479,10 +479,17 @@ function addVitrine(group, x, z, rot=0) {
   group.add(vit);
 }
 
-function addWayfindingSign(group, x, y, z, rot, lines) {
+function addWayfindingSign(group, x, y, z, rot, frontLines, backLines) {
   const sign = new THREE.Group();
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.35), new THREE.MeshBasicMaterial({map:makeSignTex(lines), transparent:true}));
-  sign.add(face);
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.35), new THREE.MeshBasicMaterial({map:makeSignTex(frontLines), transparent:true}));
+  front.position.z = 0.005;
+  sign.add(front);
+  if (backLines) {
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.35), new THREE.MeshBasicMaterial({map:makeSignTex(backLines), transparent:true}));
+    back.rotation.y = Math.PI;
+    back.position.z = -0.005;
+    sign.add(back);
+  }
   [-1.35, 1.35].forEach(px => {
     const rod = new THREE.Mesh(new THREE.BoxGeometry(.045,.7,.045), metalDarkMat);
     rod.position.set(px,.95,0);
@@ -501,7 +508,9 @@ function addRoomDetails(group, rm, ri) {
     addPedestalObject(group, 0, 0, rm.accent);
     addVitrine(group, -3.8, -1.8, .18);
     addVitrine(group, 3.8, -1.8, -.18);
-    addWayfindingSign(group, 0, 3.05, -3.7, 0, ['← 自然之境', '↑ 人间烟火', '都市光影 →']);
+    addWayfindingSign(group, 0, 3.05, -3.7, 0,
+      ['← 自然之境', '↑ 人间烟火', '都市光影 →'],
+      ['← 都市光影', '↓ 人间烟火', '自然之境 →']);
   } else if (ri === 1) {
     addPlant(group, -4.4, 3.4); addPlant(group, 4.3, -3.5);
     addBench(group, 0, 2.7, 0);
