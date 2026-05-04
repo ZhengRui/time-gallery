@@ -328,7 +328,6 @@ const wallMatShared = new THREE.MeshStandardMaterial({roughness:.9, metalness:0,
 const sideMatShared = new THREE.MeshStandardMaterial({roughness:.9, metalness:0, side:THREE.DoubleSide});
 const floorMatShared = new THREE.MeshStandardMaterial({roughness:.85, metalness:.05});
 const frameMatShared = new THREE.MeshStandardMaterial({color:0x8a7040, metalness:.5, roughness:.3});
-const trimMatShared = new THREE.MeshStandardMaterial({color:0x4d4030, metalness:.25, roughness:.45});
 const metalDarkMat = new THREE.MeshStandardMaterial({color:0x080807, metalness:.55, roughness:.35});
 const warmLightMat = new THREE.MeshStandardMaterial({color:0xfff0c8, emissive:0xffd486, emissiveIntensity:1.6, roughness:.2});
 const glassMat = new THREE.MeshStandardMaterial({color:0xd8ecff, transparent:true, opacity:.2, metalness:0, roughness:.05});
@@ -384,33 +383,6 @@ function addWallPanel(group, side, offset, length, y, height, w, d, material) {
   group.add(panel);
 }
 
-function addDoorTrim(group, side, offset, w, d) {
-  const normal = side === 'front' ? -1 : side === 'back' ? 1 : side === 'right' ? -1 : 1;
-  const postH = DOOR_H;
-  const TRIM_OFFSET = .14;
-  if (side === 'front' || side === 'back') {
-    const z = (side === 'front' ? d/2 : -d/2) + normal * TRIM_OFFSET;
-    [-1, 1].forEach(s => {
-      const post = setShadow(new THREE.Mesh(new THREE.BoxGeometry(.12, postH, .16), trimMatShared));
-      post.position.set(offset + s * DOOR_W/2, postH/2, z);
-      group.add(post);
-    });
-    const lintel = setShadow(new THREE.Mesh(new THREE.BoxGeometry(DOOR_W + .26, .16, .16), trimMatShared));
-    lintel.position.set(offset, DOOR_H + .08, z);
-    group.add(lintel);
-  } else {
-    const x = (side === 'right' ? w/2 : -w/2) + normal * TRIM_OFFSET;
-    [-1, 1].forEach(s => {
-      const post = setShadow(new THREE.Mesh(new THREE.BoxGeometry(.16, postH, .12), trimMatShared));
-      post.position.set(x, postH/2, offset + s * DOOR_W/2);
-      group.add(post);
-    });
-    const lintel = setShadow(new THREE.Mesh(new THREE.BoxGeometry(.16, .16, DOOR_W + .26), trimMatShared));
-    lintel.position.set(x, DOOR_H + .08, offset);
-    group.add(lintel);
-  }
-}
-
 function addWallWithDoors(group, side, w, h, d, material, doorOffsets) {
   const wallLen = (side === 'front' || side === 'back') ? w : d;
   const half = wallLen / 2;
@@ -424,24 +396,9 @@ function addWallWithDoors(group, side, w, h, d, material, doorOffsets) {
     addWallPanel(group, side, (cursor + int.start)/2, int.start - cursor, h/2, h, w, d, material);
     const aboveH = h - DOOR_H;
     addWallPanel(group, side, int.center, int.end - int.start, DOOR_H + aboveH/2, aboveH, w, d, material);
-    addDoorTrim(group, side, int.center, w, d);
     cursor = int.end;
   });
   addWallPanel(group, side, (cursor + half)/2, half - cursor, h/2, h, w, d, material);
-}
-
-function addBaseboards(group, w, d) {
-  const pieces = [
-    {geo:new THREE.BoxGeometry(w,.12,.08), pos:[0,.08,d/2-.04]},
-    {geo:new THREE.BoxGeometry(w,.12,.08), pos:[0,.08,-d/2+.04]},
-    {geo:new THREE.BoxGeometry(.08,.12,d), pos:[w/2-.04,.08,0]},
-    {geo:new THREE.BoxGeometry(.08,.12,d), pos:[-w/2+.04,.08,0]},
-  ];
-  pieces.forEach(p => {
-    const mesh = setShadow(new THREE.Mesh(p.geo, trimMatShared));
-    mesh.position.set(...p.pos);
-    group.add(mesh);
-  });
 }
 
 function addTrackLights(group, rm) {
@@ -537,7 +494,6 @@ function addWayfindingSign(group, x, y, z, rot, lines) {
 }
 
 function addRoomDetails(group, rm, ri) {
-  addBaseboards(group, rm.w, rm.d);
   addTrackLights(group, rm);
   if (ri === 0) {
     addBench(group, -4.2, 2.5, Math.PI/2);
