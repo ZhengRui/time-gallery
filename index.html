@@ -479,17 +479,15 @@ function addVitrine(group, x, z, rot=0) {
   group.add(vit);
 }
 
-function addWayfindingSign(group, x, y, z, rot, frontLines, backLines) {
+function addWayfindingSign(group, x, y, z, rot, lines) {
   const sign = new THREE.Group();
-  const front = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.35), new THREE.MeshBasicMaterial({map:makeSignTex(frontLines), transparent:true}));
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.35), new THREE.MeshBasicMaterial({map:makeSignTex(lines), transparent:true}));
   front.position.z = 0.005;
   sign.add(front);
-  if (backLines) {
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.35), new THREE.MeshBasicMaterial({map:makeSignTex(backLines), transparent:true}));
-    back.rotation.y = Math.PI;
-    back.position.z = -0.005;
-    sign.add(back);
-  }
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.35), new THREE.MeshBasicMaterial({color:0x080807}));
+  back.rotation.y = Math.PI;
+  back.position.z = -0.005;
+  sign.add(back);
   [-1.35, 1.35].forEach(px => {
     const rod = new THREE.Mesh(new THREE.BoxGeometry(.045,.7,.045), metalDarkMat);
     rod.position.set(px,.95,0);
@@ -509,8 +507,7 @@ function addRoomDetails(group, rm, ri) {
     addVitrine(group, -3.8, -1.8, .18);
     addVitrine(group, 3.8, -1.8, -.18);
     addWayfindingSign(group, 0, 3.05, -3.7, 0,
-      ['← 自然之境', '↑ 人间烟火', '都市光影 →'],
-      ['← 都市光影', '↓ 人间烟火', '自然之境 →']);
+      ['← 自然之境', '↑ 人间烟火', '都市光影 →']);
   } else if (ri === 1) {
     addPlant(group, -4.4, 3.4); addPlant(group, 4.3, -3.5);
     addBench(group, 0, 2.7, 0);
@@ -542,7 +539,9 @@ function addCorridor(conn) {
   const a = getDoorWorld(conn.a, conn.sideA, conn.offsetA);
   const b = getDoorWorld(conn.b, conn.sideB, conn.offsetB);
   const group = new THREE.Group();
-  const h = Math.min(ROOMS[conn.a].h, ROOMS[conn.b].h);
+  // Corridor is a low-ceiling passage: top sits just above the door
+  // opening, so the door lintel and the corridor ceiling line up.
+  const h = DOOR_H + 0.1;
   // Corridor surfaces share edges with the room floor/ceiling/walls at
   // z=±d/2 (or x=±w/2), so we use polygonOffset to push the corridor
   // depth slightly back. The corridor "loses" the depth fight, leaving
