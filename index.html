@@ -539,9 +539,10 @@ function addCorridor(conn) {
   const a = getDoorWorld(conn.a, conn.sideA, conn.offsetA);
   const b = getDoorWorld(conn.b, conn.sideB, conn.offsetB);
   const group = new THREE.Group();
-  // Corridor is a low-ceiling passage: top sits just above the door
-  // opening, so the door lintel and the corridor ceiling line up.
-  const h = DOOR_H + 0.1;
+  // Corridor is a low-ceiling passage. Its top is exactly at the door
+  // opening height so the corridor ceiling and the door lintel line up
+  // — no strip of room wall peeks out above the corridor.
+  const h = DOOR_H;
   // Corridor surfaces share edges with the room floor/ceiling/walls at
   // z=±d/2 (or x=±w/2), so we use polygonOffset to push the corridor
   // depth slightly back. The corridor "loses" the depth fight, leaving
