@@ -387,8 +387,9 @@ function addWallPanel(group, side, offset, length, y, height, w, d, material) {
 function addDoorTrim(group, side, offset, w, d) {
   const normal = side === 'front' ? -1 : side === 'back' ? 1 : side === 'right' ? -1 : 1;
   const postH = DOOR_H;
+  const TRIM_OFFSET = .14;
   if (side === 'front' || side === 'back') {
-    const z = (side === 'front' ? d/2 : -d/2) + normal * .08;
+    const z = (side === 'front' ? d/2 : -d/2) + normal * TRIM_OFFSET;
     [-1, 1].forEach(s => {
       const post = setShadow(new THREE.Mesh(new THREE.BoxGeometry(.12, postH, .16), trimMatShared));
       post.position.set(offset + s * DOOR_W/2, postH/2, z);
@@ -398,7 +399,7 @@ function addDoorTrim(group, side, offset, w, d) {
     lintel.position.set(offset, DOOR_H + .08, z);
     group.add(lintel);
   } else {
-    const x = (side === 'right' ? w/2 : -w/2) + normal * .08;
+    const x = (side === 'right' ? w/2 : -w/2) + normal * TRIM_OFFSET;
     [-1, 1].forEach(s => {
       const post = setShadow(new THREE.Mesh(new THREE.BoxGeometry(.16, postH, .12), trimMatShared));
       post.position.set(x, postH/2, offset + s * DOOR_W/2);
@@ -582,32 +583,39 @@ function addCorridor(conn) {
   const ceilTex = makeCeilingTex(0x4f4b43); ceilTex.repeat.set(1.2, 1.2);
   const ceilMat = new THREE.MeshStandardMaterial({map:ceilTex, color:0xffffff, emissive:0x2a251c, emissiveIntensity:.24, roughness:.92, metalness:0, side:THREE.DoubleSide});
 
+  // Inset floor/ceiling so their edges don't share a line with the room
+  // walls and the room floor/ceiling at z=±d/2 (avoids z-fighting that
+  // makes the corridor texture flicker through the door lintel).
+  const inset = 0.04;
+  const yEps = 0.005;
   if (Math.abs(a.x - b.x) < .01) {
-    const len = Math.abs(a.z - b.z);
+    const fullLen = Math.abs(a.z - b.z);
+    const len = Math.max(0.01, fullLen - 2 * inset);
     const zc = (a.z + b.z) / 2;
     const x = a.x;
     corridorRects.push({minX:x-CORRIDOR_W/2, maxX:x+CORRIDOR_W/2, minZ:Math.min(a.z,b.z), maxZ:Math.max(a.z,b.z), axis:'z'});
     const floor = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(CORRIDOR_W, len), floorMat), false, true);
-    floor.rotation.x = -Math.PI/2; floor.position.set(x,0,zc); group.add(floor);
+    floor.rotation.x = -Math.PI/2; floor.position.set(x, yEps, zc); group.add(floor);
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(CORRIDOR_W, len), ceilMat);
-    ceil.rotation.x = Math.PI/2; ceil.position.set(x,h,zc); group.add(ceil);
+    ceil.rotation.x = Math.PI/2; ceil.position.set(x, h - yEps, zc); group.add(ceil);
     [-1,1].forEach(s => {
-      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(len, h), wallMat));
+      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(fullLen, h), wallMat));
       wall.position.set(x + s*CORRIDOR_W/2, h/2, zc);
       wall.rotation.y = s < 0 ? Math.PI/2 : -Math.PI/2;
       group.add(wall);
     });
   } else {
-    const len = Math.abs(a.x - b.x);
+    const fullLen = Math.abs(a.x - b.x);
+    const len = Math.max(0.01, fullLen - 2 * inset);
     const xc = (a.x + b.x) / 2;
     const z = a.z;
     corridorRects.push({minX:Math.min(a.x,b.x), maxX:Math.max(a.x,b.x), minZ:z-CORRIDOR_W/2, maxZ:z+CORRIDOR_W/2, axis:'x'});
     const floor = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(len, CORRIDOR_W), floorMat), false, true);
-    floor.rotation.x = -Math.PI/2; floor.position.set(xc,0,z); group.add(floor);
+    floor.rotation.x = -Math.PI/2; floor.position.set(xc, yEps, z); group.add(floor);
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(len, CORRIDOR_W), ceilMat);
-    ceil.rotation.x = Math.PI/2; ceil.position.set(xc,h,z); group.add(ceil);
+    ceil.rotation.x = Math.PI/2; ceil.position.set(xc, h - yEps, z); group.add(ceil);
     [-1,1].forEach(s => {
-      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(len, h), wallMat));
+      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(fullLen, h), wallMat));
       wall.position.set(xc, h/2, z + s*CORRIDOR_W/2);
       wall.rotation.y = s < 0 ? 0 : Math.PI;
       group.add(wall);
