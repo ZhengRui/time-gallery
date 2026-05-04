@@ -341,9 +341,9 @@ const roomGroups = [];
 const roomRects = [];
 const corridorRects = [];
 let currentRoomIdx = 0;
-const DOOR_W = 2.4, DOOR_H = 3.2;
-const CORRIDOR_W = DOOR_W + 1.1;
-const DOOR_CLEARANCE = 0.12;
+const DOOR_W = 3.5, DOOR_H = 3.2;
+const CORRIDOR_W = DOOR_W;
+const DOOR_CLEARANCE = 0;
 
 function setShadow(mesh, cast=true, receive=true) {
   mesh.castShadow = cast;
@@ -534,44 +534,42 @@ function addCorridor(conn) {
   const b = getDoorWorld(conn.b, conn.sideB, conn.offsetB);
   const group = new THREE.Group();
   const h = Math.min(ROOMS[conn.a].h, ROOMS[conn.b].h);
-  const floorMat = floorMatShared.clone(); floorMat.color.set(0x151411);
-  const wallMat = sideMatShared.clone(); wallMat.color.set(0x171614);
+  // Corridor surfaces share edges with the room floor/ceiling/walls at
+  // z=±d/2 (or x=±w/2), so we use polygonOffset to push the corridor
+  // depth slightly back. The corridor "loses" the depth fight, leaving
+  // the room geometry visible at the seam — no flicker, no gap.
+  const polyOff = {polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1};
+  const floorMat = floorMatShared.clone(); floorMat.color.set(0x151411); Object.assign(floorMat, polyOff);
+  const wallMat = sideMatShared.clone(); wallMat.color.set(0x171614); Object.assign(wallMat, polyOff);
   const ceilTex = makeCeilingTex(0x4f4b43); ceilTex.repeat.set(1.2, 1.2);
-  const ceilMat = new THREE.MeshStandardMaterial({map:ceilTex, color:0xffffff, emissive:0x2a251c, emissiveIntensity:.24, roughness:.92, metalness:0, side:THREE.DoubleSide});
+  const ceilMat = new THREE.MeshStandardMaterial({map:ceilTex, color:0xffffff, emissive:0x2a251c, emissiveIntensity:.24, roughness:.92, metalness:0, side:THREE.DoubleSide, ...polyOff});
 
-  // Inset floor/ceiling so their edges don't share a line with the room
-  // walls and the room floor/ceiling at z=±d/2 (avoids z-fighting that
-  // makes the corridor texture flicker through the door lintel).
-  const inset = 0.04;
-  const yEps = 0.005;
   if (Math.abs(a.x - b.x) < .01) {
-    const fullLen = Math.abs(a.z - b.z);
-    const len = Math.max(0.01, fullLen - 2 * inset);
+    const len = Math.abs(a.z - b.z);
     const zc = (a.z + b.z) / 2;
     const x = a.x;
     corridorRects.push({minX:x-CORRIDOR_W/2, maxX:x+CORRIDOR_W/2, minZ:Math.min(a.z,b.z), maxZ:Math.max(a.z,b.z), axis:'z'});
     const floor = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(CORRIDOR_W, len), floorMat), false, true);
-    floor.rotation.x = -Math.PI/2; floor.position.set(x, yEps, zc); group.add(floor);
+    floor.rotation.x = -Math.PI/2; floor.position.set(x, 0, zc); group.add(floor);
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(CORRIDOR_W, len), ceilMat);
-    ceil.rotation.x = Math.PI/2; ceil.position.set(x, h - yEps, zc); group.add(ceil);
+    ceil.rotation.x = Math.PI/2; ceil.position.set(x, h, zc); group.add(ceil);
     [-1,1].forEach(s => {
-      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(fullLen, h), wallMat));
+      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(len, h), wallMat));
       wall.position.set(x + s*CORRIDOR_W/2, h/2, zc);
       wall.rotation.y = s < 0 ? Math.PI/2 : -Math.PI/2;
       group.add(wall);
     });
   } else {
-    const fullLen = Math.abs(a.x - b.x);
-    const len = Math.max(0.01, fullLen - 2 * inset);
+    const len = Math.abs(a.x - b.x);
     const xc = (a.x + b.x) / 2;
     const z = a.z;
     corridorRects.push({minX:Math.min(a.x,b.x), maxX:Math.max(a.x,b.x), minZ:z-CORRIDOR_W/2, maxZ:z+CORRIDOR_W/2, axis:'x'});
     const floor = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(len, CORRIDOR_W), floorMat), false, true);
-    floor.rotation.x = -Math.PI/2; floor.position.set(xc, yEps, z); group.add(floor);
+    floor.rotation.x = -Math.PI/2; floor.position.set(xc, 0, z); group.add(floor);
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(len, CORRIDOR_W), ceilMat);
-    ceil.rotation.x = Math.PI/2; ceil.position.set(xc, h - yEps, z); group.add(ceil);
+    ceil.rotation.x = Math.PI/2; ceil.position.set(xc, h, z); group.add(ceil);
     [-1,1].forEach(s => {
-      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(fullLen, h), wallMat));
+      const wall = setShadow(new THREE.Mesh(new THREE.PlaneGeometry(len, h), wallMat));
       wall.position.set(xc, h/2, z + s*CORRIDOR_W/2);
       wall.rotation.y = s < 0 ? 0 : Math.PI;
       group.add(wall);
