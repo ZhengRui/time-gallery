@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Noto+Serif+SC:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;height:100vh;width:100vw;font-family:'Noto Serif SC','Playfair Display',serif;color:#f5f0e8}
+canvas{display:block}
+
+#crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;border:1.5px solid rgba(201,169,110,.5);border-radius:50%;pointer-events:none;z-index:200;transition:all .2s}
+#crosshair.hit{width:14px;height:14px;border-color:rgba(201,169,110,.9);box-shadow:0 0 8px rgba(201,169,110,.3)}
+
+#loader{position:fixed;inset:0;background:#060606;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1s}
+#loader.fade{opacity:0;pointer-events:none}
+#loader h1{font-family:'Playfair Display',serif;font-size:3rem;letter-spacing:.5em;color:#c9a96e;text-transform:uppercase;animation:b 2s ease-in-out infinite}
+#loader p{margin-top:1rem;font-size:.8rem;letter-spacing:.3em;color:#8a7040}
+@keyframes b{0%,100%{opacity:.3}50%{opacity:1}}
+
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center;cursor:pointer}
+#overlay.hidden{display:none}
+#overlay .inner{text-align:center}
+#overlay h2{font-family:'Playfair Display',serif;font-size:2rem;color:#c9a96e;letter-spacing:.3em}
+#overlay p{margin-top:1rem;font-size:.75rem;color:#8a7040;letter-spacing:.15em}
+#overlay .keys{margin-top:2rem;font-size:.65rem;color:rgba(201,169,110,.4);letter-spacing:.1em;line-height:2}
+
+#hud{position:fixed;top:0;left:0;right:0;padding:1.5rem 2rem;display:flex;justify-content:space-between;align-items:flex-start;z-index:100;pointer-events:none;opacity:0;transition:opacity .5s}
+#hud.show{opacity:1}
+#hud .logo{font-family:'Playfair Display',serif;font-size:.6rem;letter-spacing:.4em;text-transform:uppercase;color:#8a7040}
+.room-label{text-align:right}
+.room-label h3{font-family:'Playfair Display',serif;font-size:1.4rem;color:#c9a96e}
+.room-label p{font-size:.55rem;letter-spacing:.25em;text-transform:uppercase;color:#8a7040;margin-top:.2rem}
+
+#photo-popup{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .4s;backdrop-filter:blur(10px)}
+#photo-popup.open{opacity:1;pointer-events:all}
+#photo-popup canvas{max-width:50vw;max-height:50vh;border:2px solid #8a7040;box-shadow:0 0 40px rgba(201,169,110,.1)}
+.pp-info{position:absolute;bottom:3rem;text-align:center}
+.pp-info h4{font-family:'Playfair Display',serif;font-size:1.3rem;color:#c9a96e}
+.pp-info p{font-size:.65rem;color:#8a7040;margin-top:.4rem;letter-spacing:.15em}
+.pp-close{position:absolute;top:1.5rem;right:2rem;font-size:1.3rem;color:#8a7040;cursor:pointer;z-index:610}
+.pp-close:hover{color:#c9a96e}
+
+#minimap{position:fixed;bottom:1.5rem;right:1.5rem;width:190px;height:170px;background:rgba(0,0,0,.5);border:1px solid rgba(201,169,110,.15);z-index:100;pointer-events:none}
+#minimap canvas{width:100%;height:100%}
