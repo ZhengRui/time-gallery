@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { canMoveTo } from './collision';
-import { direction, moveState, pitch, speed, updateCrosshair, yaw } from './controls';
+import { direction, moveState, pitch, speed, touchMoveState, updateCrosshair, yaw } from './controls';
 import { loader, overlay } from './dom';
 import { dust, dustCount } from './gallery';
 import { camera, renderer, resizeRenderer, scene } from './scene';
@@ -21,14 +21,17 @@ function animate(): void {
   camera.rotation.y = yaw;
   camera.rotation.x = pitch;
 
-  direction.set(0, 0, 0);
+  direction.set(touchMoveState.x, 0, touchMoveState.z);
   if (moveState.f) direction.z -= 1;
   if (moveState.b) direction.z += 1;
   if (moveState.l) direction.x -= 1;
   if (moveState.r) direction.x += 1;
-  direction.normalize();
+  const directionLength = direction.length();
+  if (directionLength > 1) {
+    direction.divideScalar(directionLength);
+  }
 
-  if (direction.length() > 0) {
+  if (direction.lengthSq() > 0) {
     const moveX = direction.x * Math.cos(yaw) + direction.z * Math.sin(yaw);
     const moveZ = -direction.x * Math.sin(yaw) + direction.z * Math.cos(yaw);
     const newPos = camera.position.clone();

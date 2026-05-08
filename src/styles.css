@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Noto+Serif+SC:wght@400;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow:hidden;height:100vh;width:100vw;font-family:'Noto Serif SC','Playfair Display',serif;color:#f5f0e8}
-canvas{display:block}
+html{overscroll-behavior:none}
+body{background:#000;overflow:hidden;height:100vh;height:100dvh;width:100vw;font-family:'Noto Serif SC','Playfair Display',serif;color:#f5f0e8;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;touch-action:none}
 
 #crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;border:1.5px solid rgba(201,169,110,.5);border-radius:50%;pointer-events:none;z-index:200;transition:all .2s}
 #crosshair.hit{width:14px;height:14px;border-color:rgba(201,169,110,.9);box-shadow:0 0 8px rgba(201,169,110,.3)}
@@ -18,6 +19,7 @@ canvas{display:block}
 #overlay h2{font-family:'Playfair Display',serif;font-size:2rem;color:#c9a96e;letter-spacing:.3em}
 #overlay p{margin-top:1rem;font-size:.75rem;color:#8a7040;letter-spacing:.15em}
 #overlay .keys{margin-top:2rem;font-size:.65rem;color:rgba(201,169,110,.4);letter-spacing:.1em;line-height:2}
+.touch-help{display:none}
 
 #hud{position:fixed;top:0;left:0;right:0;padding:1.5rem 2rem;display:flex;justify-content:space-between;align-items:flex-start;z-index:100;pointer-events:none;opacity:0;transition:opacity .5s}
 #hud.show{opacity:1}
@@ -37,3 +39,24 @@ canvas{display:block}
 
 #minimap{position:fixed;bottom:1.5rem;right:1.5rem;width:190px;height:170px;background:rgba(0,0,0,.5);border:1px solid rgba(201,169,110,.15);z-index:100;pointer-events:none}
 #minimap canvas{width:100%;height:100%}
+
+#touch-controls{position:fixed;inset:0;z-index:150;display:none;pointer-events:none}
+#touch-controls.show{display:block}
+.touch-joystick{position:absolute;left:1.5rem;bottom:calc(6rem + env(safe-area-inset-bottom));width:7rem;height:7rem;border:1px solid rgba(201,169,110,.24);border-radius:50%;background:rgba(0,0,0,.22);box-shadow:0 0 28px rgba(0,0,0,.25),inset 0 0 18px rgba(201,169,110,.08);opacity:.44;transition:opacity .18s,box-shadow .18s;pointer-events:auto;touch-action:none}
+#touch-stick{position:absolute;left:50%;top:50%;width:2.7rem;height:2.7rem;border-radius:50%;background:rgba(201,169,110,.34);border:1px solid rgba(245,240,232,.28);box-shadow:0 0 18px rgba(201,169,110,.2);transform:translate(-50%,-50%);pointer-events:none}
+.touch-joystick.active{opacity:.9;box-shadow:0 0 34px rgba(0,0,0,.35),inset 0 0 22px rgba(201,169,110,.14)}
+
+@media (hover:none), (pointer:coarse) {
+  .desktop-help{display:none}
+  .touch-help{display:inline}
+  #hud{padding:1rem 1.2rem}
+  .room-label h3{font-size:1.05rem}
+  #minimap{width:140px;height:126px;right:1rem;bottom:1rem}
+  #photo-popup{padding:1.25rem}
+  #photo-popup canvas{max-width:82vw;max-height:42vh}
+  .pp-info{left:1.25rem;right:1.25rem;bottom:2rem}
+}
+
+@media ((hover:none) or (pointer:coarse)) and (orientation:landscape) {
+  .touch-joystick{left:calc(1.25rem + env(safe-area-inset-left));bottom:calc(1.25rem + env(safe-area-inset-bottom))}
+}

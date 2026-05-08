@@ -22,3 +22,6 @@ export const photoPopupTitle = byId<HTMLHeadingElement>('pp-title');
 export const photoPopupDesc = byId<HTMLParagraphElement>('pp-desc');
 export const photoPopupClose = byId<HTMLDivElement>('pp-close');
 export const minimapCanvas = byId<HTMLCanvasElement>('mm-cv');
+export const touchControls = byId<HTMLDivElement>('touch-controls');
+export const touchMove = byId<HTMLDivElement>('touch-move');
+export const touchStick = byId<HTMLDivElement>('touch-stick');

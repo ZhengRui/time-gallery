@@ -19,10 +19,17 @@ html,body{margin:0;background:#000;color:#f5f0e8;overflow:hidden}
     <h2>ENTER</h2>
     <p>点击任意位置进入展览馆</p>
     <div class="keys">
-      W / ↑ — 前进 &nbsp;&nbsp; S / ↓ — 后退<br>
-      A / ← — 左移 &nbsp;&nbsp; D / → — 右移<br>
-      按住鼠标拖动 — 环顾四周<br>
-      点击画框 — 查看详情
+      <span class="desktop-help">
+        W / ↑ — 前进 &nbsp;&nbsp; S / ↓ — 后退<br>
+        A / ← — 左移 &nbsp;&nbsp; D / → — 右移<br>
+        按住鼠标拖动 — 环顾四周<br>
+        点击画框 — 查看详情
+      </span>
+      <span class="touch-help">
+        左侧拖动 — 移动<br>
+        右侧拖动 — 环顾四周<br>
+        对准画框轻点 — 查看详情
+      </span>
     </div>
   </div>
 </div>
@@ -41,6 +48,12 @@ html,body{margin:0;background:#000;color:#f5f0e8;overflow:hidden}
 </div>
 
 <div id="minimap"><canvas id="mm-cv" width="190" height="170"></canvas></div>
+
+<div id="touch-controls" aria-hidden="true">
+  <div id="touch-move" class="touch-joystick">
+    <div id="touch-stick"></div>
+  </div>
+</div>
 
 <script type="module" src="/src/main.ts"></script>
 </body>

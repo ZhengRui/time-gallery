@@ -1,19 +1,58 @@
 import * as THREE from 'three';
-import { canvasContext2d, crosshair, hud, overlay, photoPopup, photoPopupCanvas, photoPopupClose, photoPopupDesc, photoPopupTitle } from './dom';
+import {
+  canvasContext2d,
+  crosshair,
+  hud,
+  overlay,
+  photoPopup,
+  photoPopupCanvas,
+  photoPopupClose,
+  photoPopupDesc,
+  photoPopupTitle,
+  touchControls,
+  touchMove,
+  touchStick,
+} from './dom';
 import { frameMeshes, occluderMeshes } from './gallery';
 import { camera, renderer } from './scene';
 import type { FrameUserData } from './types';
 
 // ============ FIRST PERSON CONTROLS ============
 export const moveState = {f:false,b:false,l:false,r:false};
+export const touchMoveState = {x:0,z:0};
 export let yaw = 0;
 export let pitch = 0;
 let isLocked = false;
 let hasEntered = false;
 export const direction = new THREE.Vector3();
 export const speed = 5;
+const PITCH_LIMIT = Math.PI / 2.5;
+const TOUCH_MOVE_RADIUS = 46;
+const TOUCH_MOVE_HIT_SLOP = 28;
+const TOUCH_LOOK_SENSITIVITY = 0.0045;
+const TOUCH_TAP_MOVE_LIMIT = 8;
+const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+const touchNavigationAvailable =
+  hasCoarsePointer || (!hasFinePointer && navigator.maxTouchPoints > 0);
+const pointerTouchEventsAvailable = 'PointerEvent' in window;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function clampPitch(): void {
+  pitch = clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT);
+}
+
+function rotateView(deltaX: number, deltaY: number, sensitivity: number): void {
+  yaw -= deltaX * sensitivity;
+  pitch -= deltaY * sensitivity;
+  clampPitch();
+}
 
 function requestPointerLockSafe(): void {
+  if (touchNavigationAvailable) return;
   if (!renderer.domElement.requestPointerLock) return;
   try {
     const result = renderer.domElement.requestPointerLock();
@@ -25,6 +64,10 @@ function enterGallery(): void {
   hasEntered = true;
   overlay.classList.add('hidden');
   hud.classList.add('show');
+  if (touchNavigationAvailable) {
+    clearTouchMovePositionOverride();
+    touchControls.classList.add('show');
+  }
   renderer.domElement.focus();
   requestPointerLockSafe();
 }
@@ -45,14 +88,264 @@ document.addEventListener('mousedown', e => { if(e.button===0) { mouseDown = tru
 document.addEventListener('mouseup', e => { if(e.button===0) mouseDown = false; });
 document.addEventListener('mousemove', e => {
   if (isLocked) {
-    yaw -= e.movementX * 0.002;
-    pitch -= e.movementY * 0.002;
+    rotateView(e.movementX, e.movementY, 0.002);
   } else if (mouseDown) {
-    yaw -= (e.clientX - lastMX) * 0.004;
-    pitch -= (e.clientY - lastMY) * 0.004;
+    rotateView(e.clientX - lastMX, e.clientY - lastMY, 0.004);
     lastMX = e.clientX; lastMY = e.clientY;
   }
-  pitch = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, pitch));
+});
+
+let movePointerId: number | null = null;
+let lookPointerId: number | null = null;
+let moveOriginX = 0;
+let moveOriginY = 0;
+let lastLookX = 0;
+let lastLookY = 0;
+let lookStartX = 0;
+let lookStartY = 0;
+let lookMoved = false;
+let suppressTouchClickUntil = 0;
+let touchFallbackActive = false;
+
+function syncTouchActiveClass(): void {
+  const hasTouchInput = movePointerId !== null || lookPointerId !== null;
+  touchControls.classList.toggle('active', hasTouchInput);
+  if (!hasTouchInput) touchFallbackActive = false;
+}
+
+function clearTouchMovePositionOverride(): void {
+  touchMove.style.removeProperty('left');
+  touchMove.style.removeProperty('top');
+  touchMove.style.removeProperty('bottom');
+}
+
+function capturePointer(e: PointerEvent): void {
+  if (!(e.target instanceof Element) || !e.target.setPointerCapture) return;
+  try {
+    e.target.setPointerCapture(e.pointerId);
+  } catch(e) {}
+}
+
+function updateTouchMove(clientX: number, clientY: number): void {
+  const dx = clientX - moveOriginX;
+  const dy = clientY - moveOriginY;
+  const length = Math.hypot(dx, dy);
+  const scale = length > TOUCH_MOVE_RADIUS ? TOUCH_MOVE_RADIUS / length : 1;
+  const stickX = dx * scale;
+  const stickY = dy * scale;
+
+  touchMoveState.x = Math.abs(stickX) < 3 ? 0 : stickX / TOUCH_MOVE_RADIUS;
+  touchMoveState.z = Math.abs(stickY) < 3 ? 0 : stickY / TOUCH_MOVE_RADIUS;
+  touchStick.style.transform =
+    `translate(calc(-50% + ${stickX}px), calc(-50% + ${stickY}px))`;
+}
+
+function resetTouchMove(): void {
+  movePointerId = null;
+  touchMoveState.x = 0;
+  touchMoveState.z = 0;
+  touchStick.style.transform = '';
+  clearTouchMovePositionOverride();
+  touchMove.classList.remove('active');
+  syncTouchActiveClass();
+}
+
+function resetTouchLook(): void {
+  lookPointerId = null;
+  lookMoved = false;
+  syncTouchActiveClass();
+}
+
+function resetTouchInput(): void {
+  resetTouchMove();
+  resetTouchLook();
+}
+
+function startTouchMoveAt(id: number, clientX: number, clientY: number): void {
+  suppressTouchClickUntil = performance.now() + 350;
+  movePointerId = id;
+  const joystickRect = touchMove.getBoundingClientRect();
+  moveOriginX = joystickRect.left + joystickRect.width / 2;
+  moveOriginY = joystickRect.top + joystickRect.height / 2;
+  touchMove.classList.add('active');
+  syncTouchActiveClass();
+  updateTouchMove(clientX, clientY);
+}
+
+function isMoveTouchStart(clientX: number, clientY: number): boolean {
+  const rect = touchMove.getBoundingClientRect();
+  return (
+    clientX >= rect.left - TOUCH_MOVE_HIT_SLOP &&
+    clientX <= rect.right + TOUCH_MOVE_HIT_SLOP &&
+    clientY >= rect.top - TOUCH_MOVE_HIT_SLOP &&
+    clientY <= rect.bottom + TOUCH_MOVE_HIT_SLOP
+  );
+}
+
+function startTouchMove(e: PointerEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+  startTouchMoveAt(e.pointerId, e.clientX, e.clientY);
+  capturePointer(e);
+}
+
+function startTouchLookAt(id: number, clientX: number, clientY: number): void {
+  lookPointerId = id;
+  lastLookX = clientX;
+  lastLookY = clientY;
+  lookStartX = clientX;
+  lookStartY = clientY;
+  lookMoved = false;
+  syncTouchActiveClass();
+}
+
+function startTouchLook(e: PointerEvent): void {
+  e.preventDefault();
+  startTouchLookAt(e.pointerId, e.clientX, e.clientY);
+  capturePointer(e);
+}
+
+function finishTouchLook(allowTap: boolean): void {
+  suppressTouchClickUntil = performance.now() + 350;
+  const shouldOpenFrame = allowTap && !lookMoved && !showingPhoto;
+  resetTouchLook();
+  if (!shouldOpenFrame) {
+    return;
+  }
+
+  const visibleFrame = getVisibleFrameHit();
+  if (visibleFrame) {
+    showPhoto(visibleFrame.userData as FrameUserData);
+  }
+}
+
+document.addEventListener('pointerdown', e => {
+  if (!touchNavigationAvailable || e.pointerType === 'mouse' || !hasEntered || showingPhoto) return;
+  if (e.target instanceof Node && photoPopup.contains(e.target)) return;
+
+  if (isMoveTouchStart(e.clientX, e.clientY)) {
+    if (movePointerId === null) startTouchMove(e);
+  } else if (lookPointerId === null) {
+    startTouchLook(e);
+  }
+}, {passive:false});
+
+document.addEventListener('pointermove', e => {
+  if (e.pointerId === movePointerId) {
+    e.preventDefault();
+    updateTouchMove(e.clientX, e.clientY);
+  } else if (e.pointerId === lookPointerId) {
+    e.preventDefault();
+    rotateView(e.clientX - lastLookX, e.clientY - lastLookY, TOUCH_LOOK_SENSITIVITY);
+    lastLookX = e.clientX;
+    lastLookY = e.clientY;
+    if (Math.hypot(e.clientX - lookStartX, e.clientY - lookStartY) > TOUCH_TAP_MOVE_LIMIT) {
+      lookMoved = true;
+    }
+  }
+}, {passive:false});
+
+document.addEventListener('pointerup', e => {
+  if (e.pointerId === movePointerId) {
+    e.preventDefault();
+    suppressTouchClickUntil = performance.now() + 350;
+    resetTouchMove();
+  } else if (e.pointerId === lookPointerId) {
+    e.preventDefault();
+    finishTouchLook(true);
+  }
+}, {passive:false});
+
+document.addEventListener('pointercancel', e => {
+  if (e.pointerId === movePointerId) {
+    resetTouchMove();
+  } else if (e.pointerId === lookPointerId) {
+    finishTouchLook(false);
+  }
+});
+
+function shouldHandleTouchEvent(e: TouchEvent): boolean {
+  if (pointerTouchEventsAvailable) return false;
+  if (!touchNavigationAvailable || !hasEntered || showingPhoto) return false;
+  if (!touchFallbackActive && (movePointerId !== null || lookPointerId !== null)) return false;
+  if (e.target instanceof Node && photoPopup.contains(e.target)) return false;
+  return true;
+}
+
+document.addEventListener('touchstart', e => {
+  if (!shouldHandleTouchEvent(e)) return;
+
+  let handled = false;
+  for (const touch of Array.from(e.changedTouches)) {
+    if (isMoveTouchStart(touch.clientX, touch.clientY)) {
+      if (movePointerId !== null) continue;
+      touchFallbackActive = true;
+      startTouchMoveAt(touch.identifier, touch.clientX, touch.clientY);
+      handled = true;
+    } else {
+      if (lookPointerId !== null) continue;
+      touchFallbackActive = true;
+      startTouchLookAt(touch.identifier, touch.clientX, touch.clientY);
+      handled = true;
+    }
+  }
+
+  if (handled) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, {passive:false});
+
+document.addEventListener('touchmove', e => {
+  if (!touchFallbackActive) return;
+
+  let handled = false;
+  for (const touch of Array.from(e.changedTouches)) {
+    if (touch.identifier === movePointerId) {
+      updateTouchMove(touch.clientX, touch.clientY);
+      handled = true;
+    } else if (touch.identifier === lookPointerId) {
+      rotateView(touch.clientX - lastLookX, touch.clientY - lastLookY, TOUCH_LOOK_SENSITIVITY);
+      lastLookX = touch.clientX;
+      lastLookY = touch.clientY;
+      if (Math.hypot(touch.clientX - lookStartX, touch.clientY - lookStartY) > TOUCH_TAP_MOVE_LIMIT) {
+        lookMoved = true;
+      }
+      handled = true;
+    }
+  }
+
+  if (handled) e.preventDefault();
+}, {passive:false});
+
+document.addEventListener('touchend', e => {
+  if (!touchFallbackActive) return;
+
+  let handled = false;
+  for (const touch of Array.from(e.changedTouches)) {
+    if (touch.identifier === movePointerId) {
+      suppressTouchClickUntil = performance.now() + 350;
+      resetTouchMove();
+      handled = true;
+    } else if (touch.identifier === lookPointerId) {
+      finishTouchLook(true);
+      handled = true;
+    }
+  }
+
+  if (handled) e.preventDefault();
+}, {passive:false});
+
+document.addEventListener('touchcancel', e => {
+  if (!touchFallbackActive) return;
+
+  for (const touch of Array.from(e.changedTouches)) {
+    if (touch.identifier === movePointerId) {
+      resetTouchMove();
+    } else if (touch.identifier === lookPointerId) {
+      finishTouchLook(false);
+    }
+  }
 });
 
 type MoveFlag = keyof typeof moveState;
@@ -82,12 +375,13 @@ window.addEventListener('blur', () => {
   moveState.b = false;
   moveState.l = false;
   moveState.r = false;
+  resetTouchInput();
 });
 
 renderer.domElement.tabIndex = 0;
 renderer.domElement.addEventListener('click', e => {
   renderer.domElement.focus();
-  if (hasEntered && !isLocked && !showingPhoto) {
+  if (hasEntered && !touchNavigationAvailable && !isLocked && !showingPhoto) {
     e.stopPropagation();
     requestPointerLockSafe();
   }
@@ -100,8 +394,10 @@ const OCCLUSION_EPSILON = 0.08;
 let showingPhoto = false;
 
 document.addEventListener('click', e => {
+  if (performance.now() < suppressTouchClickUntil) return;
   if (photoPopup.contains(e.target as Node)) return;
-  if (!isLocked || showingPhoto) return;
+  if (showingPhoto || !hasEntered) return;
+  if (!isLocked && !touchNavigationAvailable) return;
   const visibleFrame = getVisibleFrameHit();
   if (visibleFrame) {
     showPhoto(visibleFrame.userData as FrameUserData);
@@ -109,7 +405,8 @@ document.addEventListener('click', e => {
 });
 
 export function updateCrosshair(): void {
-  if (!isLocked) return;
+  if (!hasEntered || showingPhoto) return;
+  if (!isLocked && !touchNavigationAvailable) return;
   crosshair.classList.toggle('hit', !!getVisibleFrameHit());
 }
 
@@ -132,7 +429,8 @@ function getVisibleFrameHit(): THREE.Object3D | null {
 
 function showPhoto(data: FrameUserData): void {
   showingPhoto = true;
-  document.exitPointerLock();
+  resetTouchInput();
+  document.exitPointerLock?.();
   photoPopupCanvas.width = photoPopupCanvas.height = 600;
   const ctx = canvasContext2d(photoPopupCanvas);
   const g = ctx.createRadialGradient(300,300,0,300,300,420);
