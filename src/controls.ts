@@ -14,10 +14,15 @@ import {
   touchStick,
 } from './dom';
 import { frameMeshes, occluderMeshes } from './gallery';
+import {
+  PRESENTATION_CUE_SELECTED_EVENT,
+  resolvePresentationFrameData,
+} from './presentationFrameData';
 import { camera, renderer } from './scene';
 import type { FrameUserData } from './types';
 
 // ============ FIRST PERSON CONTROLS ============
+export const PHOTO_CLOSED_EVENT = 'club-intro:photo-closed';
 export const moveState = {f:false,b:false,l:false,r:false};
 export const touchMoveState = {x:0,z:0};
 export let yaw = Math.PI;
@@ -235,7 +240,7 @@ function finishTouchLook(allowTap: boolean): void {
 
   const visibleFrame = getVisibleFrameHit();
   if (visibleFrame) {
-    openFrameData(visibleFrame.userData as FrameUserData);
+    openResolvedFrameData(visibleFrame.userData as FrameUserData);
   }
 }
 
@@ -372,8 +377,8 @@ type MoveFlag = keyof typeof moveState;
 
 function moveFlagForKey(e: KeyboardEvent): MoveFlag | null {
   const key = e.key.toLowerCase();
-  if (e.code === 'KeyW' || key === 'w' || key === 'arrowup') return 'f';
-  if (e.code === 'KeyS' || key === 's' || key === 'arrowdown') return 'b';
+  if (e.code === 'KeyW' || key === 'w') return 'f';
+  if (e.code === 'KeyS' || key === 's') return 'b';
   if (e.code === 'KeyA' || key === 'a' || key === 'arrowleft') return 'l';
   if (e.code === 'KeyD' || key === 'd' || key === 'arrowright') return 'r';
   return null;
@@ -420,7 +425,7 @@ document.addEventListener('click', e => {
   if (!isLocked && !touchNavigationAvailable) return;
   const visibleFrame = getVisibleFrameHit();
   if (visibleFrame) {
-    openFrameData(visibleFrame.userData as FrameUserData);
+    openResolvedFrameData(visibleFrame.userData as FrameUserData);
   }
 });
 
@@ -448,6 +453,16 @@ function getVisibleFrameHit(): THREE.Object3D | null {
 }
 
 let popupRenderToken = 0;
+
+function openResolvedFrameData(data: FrameUserData): void {
+  const resolved = resolvePresentationFrameData(data);
+  openFrameData(resolved.data);
+  if (resolved.cueIndex === null) return;
+
+  window.dispatchEvent(new CustomEvent(PRESENTATION_CUE_SELECTED_EVENT, {
+    detail: {cueIndex: resolved.cueIndex},
+  }));
+}
 
 function drawPopupBackground(ctx: CanvasRenderingContext2D, data: FrameUserData, w: number, h: number): void {
   const hue = data.h ?? 200;
@@ -656,8 +671,8 @@ function resizePopupCanvasForLoadedImage(data: FrameUserData, images: HTMLImageE
   if (data.kind === 'qr' || images.length === 0) return;
   const viewportW = window.innerWidth;
   const viewportH = window.innerHeight;
-  const textColumnW = viewportW >= 900 ? Math.min(viewportW * 0.34, 640) : 0;
-  const chromeW = viewportW >= 900 ? 190 + textColumnW : 48;
+  const textColumnW = viewportW >= 900 ? Math.min(viewportW * 0.43, 864) : 0;
+  const chromeW = viewportW >= 900 ? 150 + textColumnW : 48;
   const maxImageH = Math.min(1260, viewportH * 0.92);
   const maxImageW = Math.min(1280, viewportW - chromeW);
   const scale = Math.min(maxImageW / images[0].naturalWidth, maxImageH / images[0].naturalHeight);
@@ -668,22 +683,62 @@ function resizePopupCanvasForLoadedImage(data: FrameUserData, images: HTMLImageE
   photoPopupCanvas.height = Math.round(Math.max(isPortrait ? 760 : 520, imageH + 72));
 }
 
-export function openFrameData(data: FrameUserData): void {
+interface OpenFrameOptions {
+  animateCanvas?: boolean;
+}
+
+function renderPopupDesc(data: FrameUserData): void {
+  photoPopupDesc.replaceChildren();
+  if (!data.descSegments?.length) {
+    photoPopupDesc.textContent = data.desc;
+    return;
+  }
+
+  let activeBullet: HTMLSpanElement | null = null;
+  data.descSegments.forEach(segment => {
+    const span = document.createElement('span');
+    span.textContent = segment.text;
+    if (segment.tone) span.className = `pp-desc-${segment.tone}`;
+
+    if (segment.bullet) {
+      activeBullet = document.createElement('span');
+      activeBullet.className = 'pp-desc-bullet';
+      activeBullet.append(span);
+      photoPopupDesc.append(activeBullet);
+    } else if (activeBullet) {
+      activeBullet.append(span);
+    } else {
+      photoPopupDesc.append(span);
+    }
+
+    if (segment.breakAfter) {
+      activeBullet = null;
+      photoPopupDesc.append(document.createElement('br'));
+    }
+  });
+}
+
+export function openFrameData(data: FrameUserData, options: OpenFrameOptions = {}): void {
   showingPhoto = true;
   resetTouchInput();
   document.exitPointerLock?.();
+  document.body.classList.add('popup-open');
   renderer.domElement.focus();
   const renderToken = ++popupRenderToken;
+  photoPopup.scrollTop = 0;
   photoPopup.classList.remove('swap');
-  void photoPopup.offsetWidth;
-  photoPopup.classList.add('swap');
+  photoPopup.classList.remove('text-swap');
+  if (options.animateCanvas !== false) {
+    void photoPopup.offsetWidth;
+    photoPopup.classList.add('swap');
+  }
   photoPopup.classList.toggle('full-art', data.kind === 'timeline' || data.kind === 'qr');
   photoPopupCanvas.width = data.kind === 'qr' ? 980 : 1120;
   photoPopupCanvas.height = data.kind === 'qr' ? 660 : 720;
   const ctx = canvasContext2d(photoPopupCanvas);
   drawPopupFallback(ctx, data);
   photoPopupTitle.textContent = data.title;
-  photoPopupDesc.textContent = data.desc;
+  renderPopupDesc(data);
   photoPopup.classList.add('open');
 
   const imageSrcs = data.imageSrcs?.length ? data.imageSrcs : data.imageSrc ? [data.imageSrc] : [];
@@ -697,18 +752,39 @@ export function openFrameData(data: FrameUserData): void {
   }).catch(() => {});
 }
 
-function closePhoto(restorePointerLock = true): void {
-  showingPhoto = false;
-  popupRenderToken++;
-  photoPopup.classList.remove('open');
+export function updateFrameText(title: string, desc: string, descSegments?: FrameUserData['descSegments']): void {
+  if (!showingPhoto) return;
+  photoPopup.scrollTop = 0;
   photoPopup.classList.remove('swap');
-  photoPopup.classList.remove('full-art');
-  if (restorePointerLock) requestPointerLockSafe();
+  photoPopup.classList.remove('text-swap');
+  photoPopupTitle.textContent = title;
+  renderPopupDesc({title, desc, descSegments});
+  void photoPopup.offsetWidth;
+  photoPopup.classList.add('text-swap');
 }
 
-export function closeActivePhoto(restorePointerLock = false): void {
+function closePhoto(restorePointerLock = true, emitClosedEvent = true): void {
+  const wasShowingPhoto = showingPhoto;
+  showingPhoto = false;
+  popupRenderToken++;
+  document.body.classList.remove('popup-open');
+  photoPopup.classList.remove('open');
+  photoPopup.classList.remove('swap');
+  photoPopup.classList.remove('text-swap');
+  photoPopup.classList.remove('full-art');
+  if (restorePointerLock) requestPointerLockSafe();
+  if (wasShowingPhoto && emitClosedEvent) {
+    window.dispatchEvent(new CustomEvent(PHOTO_CLOSED_EVENT));
+  }
+}
+
+export function closeActivePhoto(restorePointerLock = false, emitClosedEvent = false): void {
   if (!showingPhoto) return;
-  closePhoto(restorePointerLock);
+  closePhoto(restorePointerLock, emitClosedEvent);
+}
+
+export function isPhotoOpen(): boolean {
+  return showingPhoto;
 }
 
 photoPopupClose.addEventListener('click', e => {

@@ -95,9 +95,19 @@ export interface PresentationCue {
   exhibitId: string;
   title: string;
   desc: string;
+  descSegments?: PopupTextSegment[];
   spokenCue: string;
   camera: PresentationCamera;
   transition?: 'group-start' | 'group-slide' | 'group-switch';
+}
+
+export type PopupTextTone = 'strong' | 'stat' | 'accent' | 'warm' | 'italic';
+
+export interface PopupTextSegment {
+  text: string;
+  tone?: PopupTextTone;
+  bullet?: boolean;
+  breakAfter?: boolean;
 }
 
 export interface PlanPoint {
@@ -140,6 +150,7 @@ export interface FrameUserData {
   photoIdx?: number;
   title: string;
   desc: string;
+  descSegments?: PopupTextSegment[];
   h?: number;
   s?: number;
   kind?: ExhibitKind;
