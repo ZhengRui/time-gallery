@@ -1,5 +1,8 @@
 import * as THREE from 'three';
+import { makeAssetMaterial } from './assets';
+import { CLUB_INTRO_ASSET_MAP, CLUB_INTRO_EXHIBITS } from './clubIntroData';
 import { CONNECTIONS, ROOM_PLAN, ROOMS } from './data';
+import { addClubIntroExhibit } from './exhibits';
 import {
   frameMatShared,
   glassMat,
@@ -281,20 +284,87 @@ function addWayfindingSign(group: THREE.Group, x: number, y: number, z: number, 
   group.add(sign);
 }
 
+function fitPhotoFrame(assetId: string, maxW: number, maxH: number): { width: number; height: number } | undefined {
+  const asset = CLUB_INTRO_ASSET_MAP.get(assetId);
+  if (!asset) return undefined;
+  const ratio = asset.aspect || 1.5;
+  let width = maxW;
+  let height = width / ratio;
+  if (height > maxH) {
+    height = maxH;
+    width = height * ratio;
+  }
+  return { width, height };
+}
+
+function addCorridorPhoto(
+  group: THREE.Group,
+  assetId: string,
+  x: number,
+  y: number,
+  z: number,
+  rotY: number,
+  maxW: number,
+  maxH: number,
+  accent: string,
+): void {
+  const asset = CLUB_INTRO_ASSET_MAP.get(assetId);
+  const size = fitPhotoFrame(assetId, maxW, maxH);
+  if (!asset || !size) return;
+
+  const frame = new THREE.Group();
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: 0x4c3520,
+    roughness: 0.36,
+    metalness: 0.14,
+  });
+  const matBoardMat = new THREE.MeshStandardMaterial({
+    color: 0xcfc5b0,
+    roughness: 0.78,
+    metalness: 0,
+  });
+  const border = setShadow(new THREE.Mesh(new THREE.BoxGeometry(maxW + 0.24, maxH + 0.24, 0.06), frameMat));
+  border.position.z = 0.038;
+  frame.add(border);
+
+  const matBoard = new THREE.Mesh(new THREE.PlaneGeometry(maxW + 0.06, maxH + 0.06), matBoardMat);
+  matBoard.position.z = 0.072;
+  frame.add(matBoard);
+
+  const photo = new THREE.Mesh(new THREE.PlaneGeometry(size.width, size.height), makeAssetMaterial(asset, accent));
+  photo.position.z = 0.102;
+  frame.add(photo);
+
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(size.width, size.height), pictureGlassMat);
+  glass.position.z = 0.116;
+  frame.add(glass);
+
+  const catchlight = new THREE.Mesh(
+    new THREE.PlaneGeometry(size.width * 0.18, size.height * 1.06),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.09,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  catchlight.position.set(-size.width * 0.25, 0, 0.122);
+  catchlight.rotation.z = -0.18;
+  frame.add(catchlight);
+
+  frame.position.set(x, y, z);
+  frame.rotation.y = rotY;
+  group.add(frame);
+}
+
 function addRoomDetails(group: THREE.Group, rm: RoomData, ri: number): void {
   addTrackLights(group, rm);
   if (ri === 0) {
-    addBench(group, -4.2, 2.5, Math.PI/2);
-    addBench(group, 4.2, 2.5, -Math.PI/2);
-    addPedestalObject(group, 0, 0, rm.accent);
-    addVitrine(group, -3.8, -1.8, .18);
-    addVitrine(group, 3.8, -1.8, -.18);
-    addWayfindingSign(group, 0, 3.05, -3.7, 0,
-      ['← 自然之境', '↑ 人间烟火', '都市光影 →']);
+    return;
   } else if (ri === 1) {
-    addPlant(group, -4.4, 3.4); addPlant(group, 4.3, -3.5);
-    addBench(group, 0, 2.7, 0);
-    addPedestalObject(group, -2.8, -.2, rm.accent, 'ring');
+    addPlant(group, -6.2, 5.65);
+    addPlant(group, -6.2, -5.65);
   } else if (ri === 2) {
     addVitrine(group, -2.7, 2.6, 0);
     addVitrine(group, 2.7, -2.6, Math.PI);
@@ -346,6 +416,8 @@ function addCorridor(conn: Connection): void {
       group.add(wall);
       occluderMeshes.push(wall);
     });
+    addCorridorPhoto(group, 'family-group', x - CORRIDOR_W / 2 + 0.045, 1.78, zc - len * 0.18, Math.PI / 2, 1.2, 1.45, '#4f7bd9');
+    addCorridorPhoto(group, 'ti-leadership-meeting', x + CORRIDOR_W / 2 - 0.045, 1.78, zc + len * 0.18, -Math.PI / 2, 1.35, 1.05, '#c9a96e');
   } else {
     const len = Math.abs(a.x - b.x);
     const xc = (a.x + b.x) / 2;
@@ -439,6 +511,13 @@ ROOMS.forEach((rm, ri) => {
     group.add(frameGroup);
     frameMeshes.push(frameGroup);
   });
+
+  CLUB_INTRO_EXHIBITS
+    .filter(exhibit => exhibit.roomIdx === ri)
+    .forEach(exhibit => {
+      const exhibitGroup = addClubIntroExhibit(group, rm, exhibit, CLUB_INTRO_ASSET_MAP);
+      frameMeshes.push(exhibitGroup);
+    });
 
   addRoomDetails(group, rm, ri);
 

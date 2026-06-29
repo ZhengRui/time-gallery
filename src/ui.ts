@@ -7,7 +7,7 @@ import type { Rect } from './types';
 
 // ============ MINIMAP ============
 const mmCtx = canvasContext2d(minimapCanvas);
-let currentRoomIdx = 0;
+let currentRoomIdx = -1;
 
 export function drawMinimap(): void {
   const mw = minimapCanvas.width, mh = minimapCanvas.height;

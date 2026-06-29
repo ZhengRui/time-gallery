@@ -20,8 +20,8 @@ import type { FrameUserData } from './types';
 // ============ FIRST PERSON CONTROLS ============
 export const moveState = {f:false,b:false,l:false,r:false};
 export const touchMoveState = {x:0,z:0};
-export let yaw = 0;
-export let pitch = 0;
+export let yaw = Math.PI;
+export let pitch = 0.08;
 let isLocked = false;
 let hasEntered = false;
 export const direction = new THREE.Vector3();
@@ -37,6 +37,8 @@ const touchNavigationAvailable =
   hasCoarsePointer || (!hasFinePointer && navigator.maxTouchPoints > 0);
 const pointerTouchEventsAvailable = 'PointerEvent' in window;
 
+renderer.domElement.tabIndex = 0;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -49,6 +51,16 @@ function rotateView(deltaX: number, deltaY: number, sensitivity: number): void {
   yaw -= deltaX * sensitivity;
   pitch -= deltaY * sensitivity;
   clampPitch();
+}
+
+export function setViewAngles(nextYaw: number, nextPitch: number): void {
+  yaw = nextYaw;
+  pitch = nextPitch;
+  clampPitch();
+}
+
+export function hasEnteredGallery(): boolean {
+  return hasEntered;
 }
 
 function requestPointerLockSafe(): void {
@@ -73,6 +85,14 @@ function enterGallery(): void {
 }
 
 overlay.addEventListener('click', e => {
+  e.stopPropagation();
+  enterGallery();
+});
+
+document.addEventListener('keydown', e => {
+  if (hasEntered) return;
+  if (e.code !== 'Space' && e.key !== 'Enter') return;
+  e.preventDefault();
   e.stopPropagation();
   enterGallery();
 });
@@ -215,7 +235,7 @@ function finishTouchLook(allowTap: boolean): void {
 
   const visibleFrame = getVisibleFrameHit();
   if (visibleFrame) {
-    showPhoto(visibleFrame.userData as FrameUserData);
+    openFrameData(visibleFrame.userData as FrameUserData);
   }
 }
 
@@ -400,7 +420,7 @@ document.addEventListener('click', e => {
   if (!isLocked && !touchNavigationAvailable) return;
   const visibleFrame = getVisibleFrameHit();
   if (visibleFrame) {
-    showPhoto(visibleFrame.userData as FrameUserData);
+    openFrameData(visibleFrame.userData as FrameUserData);
   }
 });
 
@@ -427,27 +447,268 @@ function getVisibleFrameHit(): THREE.Object3D | null {
   return null;
 }
 
-function showPhoto(data: FrameUserData): void {
+let popupRenderToken = 0;
+
+function drawPopupBackground(ctx: CanvasRenderingContext2D, data: FrameUserData, w: number, h: number): void {
+  const hue = data.h ?? 200;
+  const sat = data.s ?? 55;
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, `hsl(${hue},${sat * .56}%,12%)`);
+  g.addColorStop(.54, '#071014');
+  g.addColorStop(1, '#020506');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = 'rgba(255,255,255,.045)';
+  ctx.lineWidth = 1;
+  for (let x = 40; x < w; x += 84) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x - 120, h);
+    ctx.stroke();
+  }
+
+  if (data.accent) {
+    ctx.fillStyle = data.accent;
+    ctx.globalAlpha = 0.16;
+    ctx.fillRect(0, 0, 10, h);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawPopupWrappedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+): number {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  words.forEach(word => {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  });
+  if (line) lines.push(line);
+  lines.slice(0, maxLines).forEach((ln, i) => {
+    ctx.fillText(i === maxLines - 1 && lines.length > maxLines ? `${ln}...` : ln, x, y + i * lineHeight);
+  });
+  return y + Math.min(lines.length, maxLines) * lineHeight;
+}
+
+function drawTimelinePopup(ctx: CanvasRenderingContext2D, data: FrameUserData): void {
+  const w = photoPopupCanvas.width;
+  const h = photoPopupCanvas.height;
+  drawPopupBackground(ctx, data, w, h);
+
+  const entries = [
+    { year: '2014', label: 'Shenzhen Airline\nCorporate Club', x: w * 0.2, y: h * 0.64 },
+    { year: '2016', label: 'Public Club', x: w * 0.5, y: h * 0.46 },
+    { year: '2024', label: '100% English\nSpeaking Club', x: w * 0.8, y: h * 0.62 },
+  ];
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '900 56px sans-serif';
+  ctx.fillText(data.title, w / 2, 118);
+
+  ctx.fillStyle = 'rgba(245,240,232,.76)';
+  ctx.font = '700 28px sans-serif';
+  drawPopupWrappedText(ctx, data.desc, w / 2, 176, w - 230, 38, 2);
+
+  ctx.strokeStyle = data.accent || '#ff8a2a';
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  ctx.moveTo(entries[0].x, h * 0.59);
+  ctx.bezierCurveTo(w * 0.34, h * 0.36, w * 0.59, h * 0.72, entries[2].x, h * 0.52);
+  ctx.stroke();
+
+  entries.forEach((entry, index) => {
+    const boxW = index === 1 ? 230 : 245;
+    const boxH = index === 1 ? 118 : 136;
+    ctx.fillStyle = index === 1 ? 'rgba(151,86,184,.94)' : 'rgba(8,12,14,.88)';
+    ctx.fillRect(entry.x - boxW / 2, entry.y - boxH / 2, boxW, boxH);
+    ctx.strokeStyle = index === 1 ? 'rgba(245,234,212,.5)' : (data.accent || '#ff8a2a');
+    ctx.lineWidth = 3;
+    ctx.strokeRect(entry.x - boxW / 2, entry.y - boxH / 2, boxW, boxH);
+
+    ctx.fillStyle = index === 2 ? '#fff45a' : '#ff9d36';
+    ctx.font = '900 48px sans-serif';
+    ctx.fillText(entry.year, entry.x, entry.y - 25);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 24px sans-serif';
+    entry.label.split('\n').forEach((line, lineIndex) => {
+      ctx.fillText(line, entry.x, entry.y + 20 + lineIndex * 28);
+    });
+  });
+
+  ctx.fillStyle = 'rgba(245,240,232,.7)';
+  ctx.font = '800 25px sans-serif';
+  ctx.fillText("Bao'an English-speaking Club", w / 2, h - 90);
+}
+
+function drawPopupFallback(ctx: CanvasRenderingContext2D, data: FrameUserData): void {
+  const w = photoPopupCanvas.width;
+  const h = photoPopupCanvas.height;
+  drawPopupBackground(ctx, data, w, h);
+
+  if (data.kind === 'timeline') {
+    drawTimelinePopup(ctx, data);
+    return;
+  }
+
+  if (data.kind === 'qr') {
+    ctx.fillStyle = 'rgba(255,255,255,.96)';
+    ctx.fillRect(96, 128, 260, 260);
+    ctx.fillRect(w - 356, 128, 260, 260);
+    ctx.fillStyle = '#061015';
+    for (let row = 0; row < 21; row++) {
+      for (let col = 0; col < 21; col++) {
+        const finder =
+          (row < 6 && col < 6) ||
+          (row < 6 && col > 14) ||
+          (row > 14 && col < 6);
+        if (!finder && (row * 11 + col * 7 + row * col) % 4 > 1) continue;
+        const cell = 260 / 21;
+        ctx.fillRect(96 + col * cell + 1, 128 + row * cell + 1, cell - 2, cell - 2);
+        ctx.fillRect(w - 356 + col * cell + 1, 128 + row * cell + 1, cell - 2, cell - 2);
+      }
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 58px sans-serif';
+    ctx.fillText('www.soarhigh.top', w / 2, h - 196);
+    ctx.font = '800 34px sans-serif';
+    ctx.fillText('Mini app: 搜嗨头马', w / 2, h - 132);
+    return;
+  }
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 58px sans-serif';
+  let y = h * 0.28;
+  y = drawPopupWrappedText(ctx, data.title, w / 2, y, w - 140, 70, 2);
+
+  ctx.fillStyle = 'rgba(245,240,232,.86)';
+  ctx.font = '600 30px sans-serif';
+  y = drawPopupWrappedText(ctx, data.desc, w / 2, y + 64, w - 180, 42, 4);
+
+  if (data.lines?.length) {
+    ctx.fillStyle = data.accent || '#c9a96e';
+    const visibleLines = data.lines.slice(0, 5);
+    const lineHeight = visibleLines.length >= 5 ? 35 : 44;
+    const fontSize = visibleLines.length >= 5 ? 27 : 32;
+    const startY = Math.min(y + 54, h - 104 - (visibleLines.length - 1) * lineHeight);
+    ctx.font = `800 ${fontSize}px sans-serif`;
+    visibleLines.forEach((line, i) => {
+      ctx.fillText(line, w / 2, startY + i * lineHeight);
+    });
+  }
+}
+
+function loadPopupImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Unable to load ${src}`));
+    img.src = src;
+  });
+}
+
+function drawLoadedPopupImage(ctx: CanvasRenderingContext2D, data: FrameUserData, images: HTMLImageElement[]): void {
+  const w = photoPopupCanvas.width;
+  const h = photoPopupCanvas.height;
+  drawPopupBackground(ctx, data, w, h);
+
+  const maxW = w - 84;
+  const maxH = h - 84;
+  const scale = Math.min(maxW / images[0].naturalWidth, maxH / images[0].naturalHeight);
+  const imageW = images[0].naturalWidth * scale;
+  const imageH = images[0].naturalHeight * scale;
+  const imageX = (w - imageW) / 2;
+  const imageY = (h - imageH) / 2;
+  const backingPad = 16;
+
+  ctx.shadowColor = 'rgba(0,0,0,.48)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 18;
+  ctx.fillStyle = 'rgba(245,236,218,.9)';
+  ctx.fillRect(imageX - backingPad - 2, imageY - backingPad - 2, imageW + backingPad * 2 + 4, imageH + backingPad * 2 + 4);
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = 'rgba(13,18,20,.94)';
+  ctx.fillRect(imageX - backingPad, imageY - backingPad, imageW + backingPad * 2, imageH + backingPad * 2);
+  ctx.drawImage(images[0], imageX, imageY, imageW, imageH);
+}
+
+function resizePopupCanvasForLoadedImage(data: FrameUserData, images: HTMLImageElement[]): void {
+  if (data.kind === 'qr' || images.length === 0) return;
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+  const textColumnW = viewportW >= 900 ? Math.min(viewportW * 0.34, 640) : 0;
+  const chromeW = viewportW >= 900 ? 190 + textColumnW : 48;
+  const maxImageH = Math.min(1260, viewportH * 0.92);
+  const maxImageW = Math.min(1280, viewportW - chromeW);
+  const scale = Math.min(maxImageW / images[0].naturalWidth, maxImageH / images[0].naturalHeight);
+  const imageW = images[0].naturalWidth * scale;
+  const imageH = images[0].naturalHeight * scale;
+  const isPortrait = images[0].naturalHeight > images[0].naturalWidth;
+  photoPopupCanvas.width = Math.round(Math.max(isPortrait ? 560 : 720, imageW + 72));
+  photoPopupCanvas.height = Math.round(Math.max(isPortrait ? 760 : 520, imageH + 72));
+}
+
+export function openFrameData(data: FrameUserData): void {
   showingPhoto = true;
   resetTouchInput();
   document.exitPointerLock?.();
-  photoPopupCanvas.width = photoPopupCanvas.height = 600;
+  renderer.domElement.focus();
+  const renderToken = ++popupRenderToken;
+  photoPopup.classList.remove('swap');
+  void photoPopup.offsetWidth;
+  photoPopup.classList.add('swap');
+  photoPopup.classList.toggle('full-art', data.kind === 'timeline' || data.kind === 'qr');
+  photoPopupCanvas.width = data.kind === 'qr' ? 980 : 1120;
+  photoPopupCanvas.height = data.kind === 'qr' ? 660 : 720;
   const ctx = canvasContext2d(photoPopupCanvas);
-  const g = ctx.createRadialGradient(300,300,0,300,300,420);
-  g.addColorStop(0,`hsl(${data.h},${data.s}%,30%)`); g.addColorStop(.5,`hsl(${(data.h+20)%360},${data.s*.8}%,16%)`); g.addColorStop(1,`hsl(${(data.h+40)%360},${data.s*.6}%,7%)`);
-  ctx.fillStyle=g; ctx.fillRect(0,0,600,600);
-  for(let i=0;i<10;i++){ctx.beginPath();ctx.moveTo(Math.random()*600,Math.random()*600);for(let j=0;j<4;j++)ctx.bezierCurveTo(Math.random()*600,Math.random()*600,Math.random()*600,Math.random()*600,Math.random()*600,Math.random()*600);ctx.strokeStyle=`hsla(${(data.h+i*40)%360},${data.s}%,55%,${.04+Math.random()*.06})`;ctx.lineWidth=2+Math.random()*5;ctx.stroke()}
-  for(let i=0;i<6;i++){const x=Math.random()*600,y=Math.random()*600,r=30+Math.random()*120;const og=ctx.createRadialGradient(x,y,0,x,y,r);og.addColorStop(0,`hsla(${(data.h+i*50)%360},${data.s}%,60%,${.06+Math.random()*.1})`);og.addColorStop(1,`hsla(${(data.h+i*50)%360},${data.s}%,35%,0)`);ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=og;ctx.fill()}
-  ctx.fillStyle='rgba(255,255,255,.85)';ctx.font='bold 36px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(data.title,300,300);
+  drawPopupFallback(ctx, data);
   photoPopupTitle.textContent = data.title;
   photoPopupDesc.textContent = data.desc;
   photoPopup.classList.add('open');
+
+  const imageSrcs = data.imageSrcs?.length ? data.imageSrcs : data.imageSrc ? [data.imageSrc] : [];
+  if (!imageSrcs.length) return;
+
+  loadPopupImage(imageSrcs[0]).then(image => {
+    if (renderToken !== popupRenderToken || !showingPhoto) return;
+    const images = [image];
+    resizePopupCanvasForLoadedImage(data, images);
+    drawLoadedPopupImage(canvasContext2d(photoPopupCanvas), data, images);
+  }).catch(() => {});
 }
 
-function closePhoto(): void {
+function closePhoto(restorePointerLock = true): void {
   showingPhoto = false;
+  popupRenderToken++;
   photoPopup.classList.remove('open');
-  requestPointerLockSafe();
+  photoPopup.classList.remove('swap');
+  photoPopup.classList.remove('full-art');
+  if (restorePointerLock) requestPointerLockSafe();
+}
+
+export function closeActivePhoto(restorePointerLock = false): void {
+  if (!showingPhoto) return;
+  closePhoto(restorePointerLock);
 }
 
 photoPopupClose.addEventListener('click', e => {

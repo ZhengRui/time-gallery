@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>沉浸式相册展览馆</title>
+<title>SoarHigh Club Introduction Wing</title>
 <style>
 html,body{margin:0;background:#000;color:#f5f0e8;overflow:hidden}
 #loader{position:fixed;inset:0;background:#060606;z-index:1000;display:flex;align-items:center;justify-content:center}
@@ -12,39 +12,33 @@ html,body{margin:0;background:#000;color:#f5f0e8;overflow:hidden}
 </head>
 <body>
 
-<div id="loader"><h1>Gallery</h1><p>点击进入展览馆</p></div>
+<div id="loader"><h1>SoarHigh</h1><p>Club Introduction Wing</p></div>
 
 <div id="overlay">
   <div class="inner">
-    <h2>ENTER</h2>
-    <p>点击任意位置进入展览馆</p>
-    <div class="keys">
-      <span class="desktop-help">
-        W / ↑ — 前进 &nbsp;&nbsp; S / ↓ — 后退<br>
-        A / ← — 左移 &nbsp;&nbsp; D / → — 右移<br>
-        按住鼠标拖动 — 环顾四周<br>
-        点击画框 — 查看详情
-      </span>
-      <span class="touch-help">
-        左侧拖动 — 移动<br>
-        右侧拖动 — 环顾四周<br>
-        对准画框轻点 — 查看详情
-      </span>
-    </div>
+    <span>SoarHigh Toastmasters Club</span>
+    <h2>Club Introduction Wing</h2>
+    <p>Enter Gallery</p>
   </div>
 </div>
 
 <div id="crosshair"></div>
 
 <div id="hud">
-  <div class="logo">Gallery Experience</div>
-  <div class="room-label"><h3 id="rl-name">大厅</h3><p id="rl-sub">The Grand Hall</p></div>
+  <div class="logo">Club Introduction</div>
+  <div class="room-label"><h3 id="rl-name">Toastmasters International</h3><p id="rl-sub">Global Communication Network</p></div>
+</div>
+
+<div id="presentation-hud">
+  <span id="presentation-status">Guided intro</span>
+  <b>Space / → next · ← previous · Esc exit</b>
 </div>
 
 <div id="photo-popup">
   <div class="pp-close" id="pp-close">✕</div>
   <canvas id="pp-cv" width="600" height="600"></canvas>
   <div class="pp-info"><h4 id="pp-title"></h4><p id="pp-desc"></p></div>
+  <div class="pp-hint">Esc close</div>
 </div>
 
 <div id="minimap"><canvas id="mm-cv" width="190" height="170"></canvas></div>

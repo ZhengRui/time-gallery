@@ -3,6 +3,7 @@ import { canMoveTo } from './collision';
 import { direction, moveState, pitch, speed, touchMoveState, updateCrosshair, yaw } from './controls';
 import { loader, overlay } from './dom';
 import { dust, dustCount } from './gallery';
+import { updatePresentation } from './presentation';
 import { camera, renderer, resizeRenderer, scene } from './scene';
 import { drawMinimap, updateCurrentRoom } from './ui';
 
@@ -17,28 +18,32 @@ function animate(): void {
   const dt = Math.min(clock.getDelta(), 0.05);
   if (document.hidden) return;
 
+  const presentationOwnsCamera = updatePresentation(dt);
+
   camera.rotation.order = 'YXZ';
   camera.rotation.y = yaw;
   camera.rotation.x = pitch;
 
-  direction.set(touchMoveState.x, 0, touchMoveState.z);
-  if (moveState.f) direction.z -= 1;
-  if (moveState.b) direction.z += 1;
-  if (moveState.l) direction.x -= 1;
-  if (moveState.r) direction.x += 1;
-  const directionLength = direction.length();
-  if (directionLength > 1) {
-    direction.divideScalar(directionLength);
-  }
+  if (!presentationOwnsCamera) {
+    direction.set(touchMoveState.x, 0, touchMoveState.z);
+    if (moveState.f) direction.z -= 1;
+    if (moveState.b) direction.z += 1;
+    if (moveState.l) direction.x -= 1;
+    if (moveState.r) direction.x += 1;
+    const directionLength = direction.length();
+    if (directionLength > 1) {
+      direction.divideScalar(directionLength);
+    }
 
-  if (direction.lengthSq() > 0) {
-    const moveX = direction.x * Math.cos(yaw) + direction.z * Math.sin(yaw);
-    const moveZ = -direction.x * Math.sin(yaw) + direction.z * Math.cos(yaw);
-    const newPos = camera.position.clone();
-    newPos.x += moveX * speed * dt;
-    newPos.z += moveZ * speed * dt;
-    if (canMoveTo(newPos)) {
-      camera.position.copy(newPos);
+    if (direction.lengthSq() > 0) {
+      const moveX = direction.x * Math.cos(yaw) + direction.z * Math.sin(yaw);
+      const moveZ = -direction.x * Math.sin(yaw) + direction.z * Math.cos(yaw);
+      const newPos = camera.position.clone();
+      newPos.x += moveX * speed * dt;
+      newPos.z += moveZ * speed * dt;
+      if (canMoveTo(newPos)) {
+        camera.position.copy(newPos);
+      }
     }
   }
 
@@ -74,11 +79,17 @@ function animate(): void {
 }
 
 export function startApp(): void {
-  loader.addEventListener('click', () => {
+  let loaderDismissed = false;
+  const dismissLoader = (): void => {
+    if (loaderDismissed) return;
+    loaderDismissed = true;
     loader.classList.add('fade');
     setTimeout(() => loader.style.display = 'none', 1000);
     overlay.classList.remove('hidden');
-  });
+  };
+
+  loader.addEventListener('click', dismissLoader);
+  window.setTimeout(dismissLoader, 900);
 
   animate();
   window.addEventListener('resize', resizeRenderer);

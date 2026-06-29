@@ -1,6 +1,18 @@
 export type WallSide = 'front' | 'back' | 'left' | 'right';
 export type Axis = 'x' | 'z';
 export type Accent = [number, number, number];
+export type ExhibitKind = 'photo' | 'poster' | 'data' | 'keyword' | 'timeline' | 'map' | 'qr' | 'slogan';
+export type AssetKind = 'photo' | 'poster' | 'graphic' | 'qr' | 'logo';
+export type AssetRole =
+  | 'toastmasters-scale'
+  | 'network'
+  | 'public-speaking'
+  | 'leadership'
+  | 'soarhigh-history'
+  | 'family'
+  | 'fun'
+  | 'growth'
+  | 'final-cta';
 
 export interface PhotoData {
   t: string;
@@ -29,6 +41,63 @@ export interface RoomData {
   accent: Accent;
   layout: LayoutItem[];
   photos: PhotoData[];
+}
+
+export interface ClubIntroAsset {
+  id: string;
+  kind: AssetKind;
+  title: string;
+  role: AssetRole;
+  aspect?: number;
+  sourceUrl?: string;
+  localPath?: string;
+  meetingNo?: number;
+  meetingTheme?: string;
+  caption?: string;
+  credit?: string;
+}
+
+export interface ExhibitData {
+  id: string;
+  kind: ExhibitKind;
+  roomIdx: number;
+  wall: WallSide;
+  title: string;
+  desc: string;
+  x?: number;
+  z?: number;
+  y?: number;
+  width: number;
+  height: number;
+  rotationZ?: number;
+  assetIds?: string[];
+  lines?: string[];
+  accent?: string;
+  showPlaque?: boolean;
+}
+
+export interface PresentationGroup {
+  id: string;
+  title: string;
+  roomIdx: number;
+  exhibitIds: string[];
+}
+
+export interface PresentationCamera {
+  position: [number, number, number];
+  lookAt: [number, number, number];
+  durationMs: number;
+}
+
+export interface PresentationCue {
+  id: string;
+  groupId: string;
+  exhibitId: string;
+  title: string;
+  desc: string;
+  spokenCue: string;
+  camera: PresentationCamera;
+  transition?: 'group-start' | 'group-slide' | 'group-switch';
 }
 
 export interface PlanPoint {
@@ -66,10 +135,16 @@ export interface DoorWorldPoint {
 }
 
 export interface FrameUserData {
-  roomIdx: number;
-  photoIdx: number;
+  id?: string;
+  roomIdx?: number;
+  photoIdx?: number;
   title: string;
   desc: string;
-  h: number;
-  s: number;
+  h?: number;
+  s?: number;
+  kind?: ExhibitKind;
+  imageSrc?: string;
+  imageSrcs?: string[];
+  lines?: string[];
+  accent?: string;
 }
