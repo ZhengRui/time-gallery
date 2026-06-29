@@ -98,7 +98,6 @@ export interface PresentationCue {
   descSegments?: PopupTextSegment[];
   spokenCue: string;
   camera: PresentationCamera;
-  transition?: 'group-start' | 'group-slide' | 'group-switch';
 }
 
 export type PopupTextTone = 'strong' | 'stat' | 'accent' | 'warm' | 'italic';

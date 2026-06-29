@@ -534,7 +534,6 @@ export const CLUB_INTRO_PRESENTATION_CUES: PresentationCue[] = [
       lookAt: [8.5, 2.5, -7.75],
       durationMs: 1100,
     },
-    transition: 'group-start',
   },
   {
     id: 'ti-nonprofit-purpose',
@@ -559,7 +558,6 @@ export const CLUB_INTRO_PRESENTATION_CUES: PresentationCue[] = [
       lookAt: [8.5, 2.45, -7.45],
       durationMs: 650,
     },
-    transition: 'group-slide',
   },
   {
     id: 'ti-contest-stage',
@@ -582,7 +580,6 @@ export const CLUB_INTRO_PRESENTATION_CUES: PresentationCue[] = [
       lookAt: [8.5, 2.42, -3.16],
       durationMs: 900,
     },
-    transition: 'group-slide',
   },
   {
     id: 'ti-smedley-origin',
@@ -605,7 +602,6 @@ export const CLUB_INTRO_PRESENTATION_CUES: PresentationCue[] = [
       lookAt: [5.25, 2.42, 1.0],
       durationMs: 1250,
     },
-    transition: 'group-switch',
   },
   {
     id: 'ti-ymca-roots',
@@ -627,7 +623,6 @@ export const CLUB_INTRO_PRESENTATION_CUES: PresentationCue[] = [
       lookAt: [1.05, 3.22, 1.0],
       durationMs: 850,
     },
-    transition: 'group-slide',
   },
   {
     id: 'ti-early-meeting',
@@ -648,7 +643,6 @@ export const CLUB_INTRO_PRESENTATION_CUES: PresentationCue[] = [
       lookAt: [0.55, 1.45, 1.0],
       durationMs: 750,
     },
-    transition: 'group-slide',
   },
   {
     id: 'ti-global-scale',
@@ -669,6 +663,5 @@ export const CLUB_INTRO_PRESENTATION_CUES: PresentationCue[] = [
       lookAt: [-4.15, 2.45, 1.0],
       durationMs: 950,
     },
-    transition: 'group-slide',
   },
 ];

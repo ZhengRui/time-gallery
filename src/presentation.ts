@@ -197,10 +197,6 @@ function updateNavButtons(): void {
   presentationNext.disabled = !canUseNav || currentIndex >= cueCount - 1;
 }
 
-export function isPresentationActive(): boolean {
-  return active;
-}
-
 export function updatePresentation(dt: number): boolean {
   if (!active) return false;
 
