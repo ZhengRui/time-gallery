@@ -71,6 +71,8 @@ export interface ExhibitData {
   width: number;
   height: number;
   rotationZ?: number;
+  matInset?: number;
+  presentationCueId?: string;
   assetIds?: string[];
   lines?: string[];
   accent?: string;

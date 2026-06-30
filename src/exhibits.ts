@@ -131,7 +131,7 @@ function addPrimaryAsset(
   exhibit: ExhibitData,
   asset: ClubIntroAsset,
 ): void {
-  const matInset = 0.1;
+  const matInset = exhibit.matInset ?? 0.1;
   const maxW = Math.max(0.1, exhibit.width - matInset * 2);
   const maxH = Math.max(0.1, exhibit.height - matInset * 2);
   const size = mountedAssetSize(asset, maxW, maxH);

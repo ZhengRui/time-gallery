@@ -2,6 +2,7 @@ import {
   CLUB_INTRO_ASSET_MAP,
   CLUB_INTRO_EXHIBIT_MAP,
   CLUB_INTRO_PRESENTATION_CUES,
+  CLUB_INTRO_PRESENTATION_GROUPS,
 } from './clubIntroData';
 import type { FrameUserData, PresentationCue } from './types';
 
@@ -58,12 +59,31 @@ export function frameDataForPresentationCue(cue: PresentationCue): FrameUserData
   };
 }
 
+const cueById = new Map<string, {cue: PresentationCue; index: number}>();
 const defaultCueByExhibitId = new Map<string, {cue: PresentationCue; index: number}>();
 
 CLUB_INTRO_PRESENTATION_CUES.forEach((cue, index) => {
+  cueById.set(cue.id, {cue, index});
   if (!defaultCueByExhibitId.has(cue.exhibitId)) {
     defaultCueByExhibitId.set(cue.exhibitId, {cue, index});
   }
+});
+
+CLUB_INTRO_EXHIBIT_MAP.forEach(exhibit => {
+  if (!exhibit.presentationCueId) return;
+  const match = cueById.get(exhibit.presentationCueId);
+  if (match) defaultCueByExhibitId.set(exhibit.id, match);
+});
+
+CLUB_INTRO_PRESENTATION_GROUPS.forEach(group => {
+  const firstCueIndex = CLUB_INTRO_PRESENTATION_CUES.findIndex(cue => cue.groupId === group.id);
+  if (firstCueIndex < 0) return;
+  const firstCue = CLUB_INTRO_PRESENTATION_CUES[firstCueIndex];
+  group.exhibitIds.forEach(exhibitId => {
+    if (!defaultCueByExhibitId.has(exhibitId)) {
+      defaultCueByExhibitId.set(exhibitId, {cue: firstCue, index: firstCueIndex});
+    }
+  });
 });
 
 export function resolvePresentationFrameData(data: FrameUserData): ResolvedPresentationFrameData {

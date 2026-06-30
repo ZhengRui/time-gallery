@@ -642,7 +642,82 @@ function loadPopupImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+function drawCoveredImage(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
+  const sw = w / scale;
+  const sh = h / scale;
+  const sx = (image.naturalWidth - sw) / 2;
+  const sy = (image.naturalHeight - sh) / 2;
+  ctx.drawImage(image, sx, sy, sw, sh, x, y, w, h);
+}
+
+function drawCollageTile(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rotation: number,
+): void {
+  const pad = 14;
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.rotate(rotation);
+  ctx.shadowColor = 'rgba(0,0,0,.5)';
+  ctx.shadowBlur = 26;
+  ctx.shadowOffsetY = 16;
+  ctx.fillStyle = 'rgba(245,236,218,.94)';
+  ctx.fillRect(-w / 2 - pad, -h / 2 - pad, w + pad * 2, h + pad * 2);
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = 'rgba(13,18,20,.95)';
+  ctx.fillRect(-w / 2 - 5, -h / 2 - 5, w + 10, h + 10);
+  drawCoveredImage(ctx, image, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+function drawLoadedPopupCollage(ctx: CanvasRenderingContext2D, data: FrameUserData, images: HTMLImageElement[]): void {
+  const w = photoPopupCanvas.width;
+  const h = photoPopupCanvas.height;
+  drawPopupBackground(ctx, data, w, h);
+
+  const tiles = images.length > 4
+    ? [
+      {x: 58, y: 64, w: 202, h: 152, r: -0.035},
+      {x: 298, y: 94, w: 202, h: 152, r: 0.026},
+      {x: 538, y: 62, w: 202, h: 152, r: -0.024},
+      {x: 778, y: 96, w: 202, h: 152, r: 0.028},
+      {x: 76, y: 412, w: 202, h: 152, r: 0.02},
+      {x: 334, y: 378, w: 152, h: 204, r: -0.024},
+      {x: 528, y: 424, w: 258, h: 146, r: 0.018},
+      {x: 812, y: 396, w: 164, h: 150, r: -0.02},
+    ]
+    : [
+      {x: 64, y: 56, w: 424, h: 284, r: -0.035},
+      {x: 552, y: 86, w: 414, h: 278, r: 0.028},
+      {x: 126, y: 414, w: 286, h: 306, r: 0.032},
+      {x: 464, y: 402, w: 444, h: 296, r: -0.024},
+    ];
+
+  images.slice(0, tiles.length).forEach((image, index) => {
+    const tile = tiles[index];
+    drawCollageTile(ctx, image, tile.x, tile.y, tile.w, tile.h, tile.r);
+  });
+}
+
 function drawLoadedPopupImage(ctx: CanvasRenderingContext2D, data: FrameUserData, images: HTMLImageElement[]): void {
+  if (images.length > 1) {
+    drawLoadedPopupCollage(ctx, data, images);
+    return;
+  }
+
   const w = photoPopupCanvas.width;
   const h = photoPopupCanvas.height;
   drawPopupBackground(ctx, data, w, h);
@@ -669,6 +744,12 @@ function drawLoadedPopupImage(ctx: CanvasRenderingContext2D, data: FrameUserData
 
 function resizePopupCanvasForLoadedImage(data: FrameUserData, images: HTMLImageElement[]): void {
   if (data.kind === 'qr' || images.length === 0) return;
+  if (images.length > 1) {
+    photoPopupCanvas.width = 1040;
+    photoPopupCanvas.height = 760;
+    return;
+  }
+
   const viewportW = window.innerWidth;
   const viewportH = window.innerHeight;
   const textColumnW = viewportW >= 900 ? Math.min(viewportW * 0.43, 864) : 0;
@@ -744,9 +825,8 @@ export function openFrameData(data: FrameUserData, options: OpenFrameOptions = {
   const imageSrcs = data.imageSrcs?.length ? data.imageSrcs : data.imageSrc ? [data.imageSrc] : [];
   if (!imageSrcs.length) return;
 
-  loadPopupImage(imageSrcs[0]).then(image => {
+  Promise.all(imageSrcs.map(loadPopupImage)).then(images => {
     if (renderToken !== popupRenderToken || !showingPhoto) return;
-    const images = [image];
     resizePopupCanvasForLoadedImage(data, images);
     drawLoadedPopupImage(canvasContext2d(photoPopupCanvas), data, images);
   }).catch(() => {});
