@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeAssetMaterial, makeExhibitTexture } from './assets';
+import { makeAssetMaterial, makeCircleAssetMaterial, makeExhibitTexture } from './assets';
 import {
   makePlaqueTex,
   pictureGlassMat,
@@ -7,6 +7,11 @@ import {
 import type { ClubIntroAsset, ExhibitData, FrameUserData, RoomData } from './types';
 
 export const exhibitMeshes = new Map<string, THREE.Group>();
+
+const FRAME_SHADOW_PAD = 0.22;
+const FRAME_SHADOW_OPACITY = 0.2;
+const FRAME_SHADOW_OFFSET = 0.045;
+const FRAME_SHADOW_Z = 0.018;
 
 function accentHue(accent?: string): number {
   const hex = (accent || '#c9a96e').replace('#', '');
@@ -114,6 +119,13 @@ function mountedAssetSize(asset: ClubIntroAsset, maxW: number, maxH: number): { 
   return { width, height };
 }
 
+function roleAccent(asset: ClubIntroAsset, fallback?: string): string {
+  if (asset.role === 'network') return '#0582ca';
+  if (asset.role === 'public-speaking') return '#8fd14f';
+  if (asset.role === 'leadership') return '#8e44ad';
+  return fallback || '#c9a96e';
+}
+
 function addPrimaryAsset(
   group: THREE.Group,
   exhibit: ExhibitData,
@@ -166,6 +178,60 @@ function addWallSign(group: THREE.Group, exhibit: ExhibitData): void {
   addFrameRails(group, exhibit.width, exhibit.height, 0.035, 0.055, makeLinerMaterial(exhibit), 0.078);
 }
 
+function addCirclePhotoFrame(
+  group: THREE.Group,
+  exhibit: ExhibitData,
+  asset: ClubIntroAsset,
+): void {
+  const radius = Math.min(exhibit.width, exhibit.height) / 2;
+  const frameMaterial = makeFrameMaterial(exhibit);
+  const matBoardMaterial = new THREE.MeshStandardMaterial({
+    color: 0xcfc5b0,
+    roughness: 0.78,
+    metalness: 0,
+  });
+
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(radius * 1.04, 96),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: FRAME_SHADOW_OPACITY,
+      depthWrite: false,
+    }),
+  );
+  shadow.position.set(FRAME_SHADOW_OFFSET, -FRAME_SHADOW_OFFSET, FRAME_SHADOW_Z);
+  group.add(shadow);
+
+  const outerRing = new THREE.Mesh(
+    new THREE.RingGeometry(radius * 0.95, radius, 128),
+    frameMaterial,
+  );
+  outerRing.position.z = 0.072;
+  group.add(outerRing);
+
+  const matBoard = new THREE.Mesh(
+    new THREE.CircleGeometry(radius * 0.95, 96),
+    matBoardMaterial,
+  );
+  matBoard.position.z = 0.052;
+  group.add(matBoard);
+
+  const photo = new THREE.Mesh(
+    new THREE.CircleGeometry(radius * 0.89, 128),
+    makeCircleAssetMaterial(asset, roleAccent(asset, exhibit.accent)),
+  );
+  photo.position.z = 0.092;
+  group.add(photo);
+
+  const glass = new THREE.Mesh(
+    new THREE.CircleGeometry(radius * 0.89, 128),
+    pictureGlassMat,
+  );
+  glass.position.z = 0.116;
+  group.add(glass);
+}
+
 export function addClubIntroExhibit(
   parent: THREE.Group,
   room: RoomData,
@@ -177,28 +243,27 @@ export function addClubIntroExhibit(
     .filter((asset): asset is ClubIntroAsset => !!asset);
   const visualAssets = assets.filter(asset => asset.kind === 'photo' || asset.kind === 'poster');
   const isWallSign = exhibit.kind === 'slogan' || exhibit.kind === 'qr';
-  const shadowPad = 0.22;
-  const shadowOpacity = 0.2;
-  const shadowOffset = 0.045;
 
   const group = new THREE.Group();
   group.rotation.z = exhibit.rotationZ ?? 0;
 
-  if (isWallSign) {
+  if (exhibit.kind === 'circle-photo' && visualAssets[0]) {
+    addCirclePhotoFrame(group, exhibit, visualAssets[0]);
+  } else if (isWallSign) {
     addWallSign(group, exhibit);
   } else {
     const shadow = new THREE.Mesh(
       new THREE.PlaneGeometry(
-        exhibit.width + shadowPad,
-        exhibit.height + shadowPad,
+        exhibit.width + FRAME_SHADOW_PAD,
+        exhibit.height + FRAME_SHADOW_PAD,
       ),
       new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
-        opacity: shadowOpacity,
+        opacity: FRAME_SHADOW_OPACITY,
       }),
     );
-    shadow.position.set(shadowOffset, -shadowOffset, 0.018);
+    shadow.position.set(FRAME_SHADOW_OFFSET, -FRAME_SHADOW_OFFSET, FRAME_SHADOW_Z);
     group.add(shadow);
 
     if (visualAssets.length > 0) {

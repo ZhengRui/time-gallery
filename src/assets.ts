@@ -325,3 +325,90 @@ export function makeAssetMaterial(asset: ClubIntroAsset, accentHex?: string): TH
 
   return material;
 }
+
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+): void {
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = width / height;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+  let cropX = 0;
+  let cropY = 0;
+
+  if (sourceRatio > targetRatio) {
+    cropWidth = sourceHeight * targetRatio;
+    cropX = (sourceWidth - cropWidth) / 2;
+  } else {
+    cropHeight = sourceWidth / targetRatio;
+    cropY = (sourceHeight - cropHeight) / 2;
+  }
+
+  ctx.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, width, height);
+}
+
+function makeCircleAssetFallbackTexture(accentHex?: string): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvasContext2d(canvas);
+  const accent = parseAccent(accentHex);
+  const glow = ctx.createRadialGradient(512, 430, 80, 512, 512, 620);
+  glow.addColorStop(0, rgba(accent, 0.55));
+  glow.addColorStop(0.42, '#123642');
+  glow.addColorStop(1, '#061015');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = 'rgba(255,255,255,.1)';
+  ctx.lineWidth = 3;
+  for (let x = 72; x < canvas.width; x += 110) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x - 180, canvas.height);
+    ctx.stroke();
+  }
+  return prepTexture(new THREE.CanvasTexture(canvas));
+}
+
+function makeCircleTextureFromImage(image: HTMLImageElement): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvasContext2d(canvas);
+  drawImageCover(ctx, image, canvas.width, canvas.height);
+  return prepTexture(new THREE.CanvasTexture(canvas));
+}
+
+export function makeCircleAssetMaterial(asset: ClubIntroAsset, accentHex?: string): THREE.MeshStandardMaterial {
+  const fallback = makeCircleAssetFallbackTexture(accentHex);
+  const material = new THREE.MeshStandardMaterial({
+    map: fallback,
+    roughness: 0.52,
+    metalness: 0,
+  });
+  const url = asset.localPath || asset.sourceUrl;
+  if (!url) return material;
+
+  textureLoader.load(
+    url,
+    texture => {
+      const image = texture.image as HTMLImageElement;
+      if (!image) return;
+      material.map = makeCircleTextureFromImage(image);
+      material.needsUpdate = true;
+      texture.dispose();
+    },
+    undefined,
+    () => {
+      material.map = fallback;
+      material.needsUpdate = true;
+    },
+  );
+
+  return material;
+}

@@ -21,7 +21,18 @@ import {
   woodMat,
 } from './materials';
 import { scene } from './scene';
-import type { Accent, Connection, CorridorRect, DoorWorldPoint, Rect, RoomData, RoomRect, WallSide } from './types';
+import type {
+  Accent,
+  ClubIntroAsset,
+  Connection,
+  CorridorRect,
+  DoorWorldPoint,
+  FrameUserData,
+  Rect,
+  RoomData,
+  RoomRect,
+  WallSide,
+} from './types';
 
 export const frameMeshes: THREE.Group[] = [];
 export const occluderMeshes: THREE.Mesh[] = [];
@@ -33,6 +44,10 @@ export const DOOR_W = 3.5;
 const DOOR_H = 3.2;
 const CORRIDOR_W = DOOR_W;
 const DOOR_CLEARANCE = 0;
+const FRAME_SHADOW_PAD = 0.22;
+const FRAME_SHADOW_OPACITY = 0.2;
+const FRAME_SHADOW_OFFSET = 0.045;
+const FRAME_SHADOW_Z = 0.018;
 
 type DoorMap = Record<WallSide, number[]>;
 type TrimSpan = { center: number; length: number };
@@ -297,6 +312,66 @@ function fitPhotoFrame(assetId: string, maxW: number, maxH: number): { width: nu
   return { width, height };
 }
 
+function hexHue(accent: string): number {
+  const hex = accent.replace('#', '');
+  const n = Number.parseInt(hex.length === 3
+    ? hex.split('').map(ch => ch + ch).join('')
+    : hex, 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return 40;
+  let h = 0;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return Math.round((h * 60 + 360) % 360);
+}
+
+function makeCorridorPhotoUserData(asset: ClubIntroAsset, accent: string): FrameUserData {
+  const imageSrc = asset.localPath || asset.sourceUrl;
+  const meetingLabel = asset.meetingNo ? `SoarHigh Club Meeting #${asset.meetingNo}` : undefined;
+  const context = [meetingLabel, asset.meetingTheme].filter(Boolean).join(': ');
+  const desc = [context, asset.caption].filter(Boolean).join('. ');
+
+  return {
+    id: `corridor-${asset.id}`,
+    title: asset.title,
+    desc: desc || asset.title,
+    h: hexHue(accent),
+    s: 62,
+    kind: 'photo',
+    imageSrc,
+    imageSrcs: imageSrc ? [imageSrc] : [],
+    accent,
+  };
+}
+
+function addCorridorFrameRails(
+  group: THREE.Group,
+  width: number,
+  height: number,
+  rail: number,
+  depth: number,
+  material: THREE.Material,
+  z: number,
+): void {
+  const topBottomGeo = new THREE.BoxGeometry(width + rail * 2, rail, depth);
+  const sideGeo = new THREE.BoxGeometry(rail, height, depth);
+  const top = setShadow(new THREE.Mesh(topBottomGeo, material));
+  const bottom = setShadow(new THREE.Mesh(topBottomGeo, material));
+  const left = setShadow(new THREE.Mesh(sideGeo, material));
+  const right = setShadow(new THREE.Mesh(sideGeo, material));
+  top.position.set(0, height / 2 + rail / 2, z);
+  bottom.position.set(0, -height / 2 - rail / 2, z);
+  left.position.set(-width / 2 - rail / 2, 0, z);
+  right.position.set(width / 2 + rail / 2, 0, z);
+  [top, bottom, left, right].forEach(part => group.add(part));
+}
+
 function addCorridorPhoto(
   group: THREE.Group,
   assetId: string,
@@ -309,7 +384,7 @@ function addCorridorPhoto(
   accent: string,
 ): void {
   const asset = CLUB_INTRO_ASSET_MAP.get(assetId);
-  const size = fitPhotoFrame(assetId, maxW, maxH);
+  const size = fitPhotoFrame(assetId, Math.max(0.1, maxW - 0.1), Math.max(0.1, maxH - 0.1));
   if (!asset || !size) return;
 
   const frame = new THREE.Group();
@@ -323,20 +398,33 @@ function addCorridorPhoto(
     roughness: 0.78,
     metalness: 0,
   });
-  const border = setShadow(new THREE.Mesh(new THREE.BoxGeometry(maxW + 0.24, maxH + 0.24, 0.06), frameMat));
-  border.position.z = 0.038;
-  frame.add(border);
+  const linerMat = new THREE.MeshStandardMaterial({
+    color: accent,
+    roughness: 0.26,
+    metalness: 0.42,
+  });
 
-  const matBoard = new THREE.Mesh(new THREE.PlaneGeometry(maxW + 0.06, maxH + 0.06), matBoardMat);
-  matBoard.position.z = 0.072;
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(maxW + FRAME_SHADOW_PAD, maxH + FRAME_SHADOW_PAD),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: FRAME_SHADOW_OPACITY,
+    }),
+  );
+  shadow.position.set(FRAME_SHADOW_OFFSET, -FRAME_SHADOW_OFFSET, FRAME_SHADOW_Z);
+  frame.add(shadow);
+
+  const matBoard = new THREE.Mesh(new THREE.PlaneGeometry(maxW, maxH), matBoardMat);
+  matBoard.position.z = 0.052;
   frame.add(matBoard);
 
   const photo = new THREE.Mesh(new THREE.PlaneGeometry(size.width, size.height), makeAssetMaterial(asset, accent));
-  photo.position.z = 0.102;
+  photo.position.z = 0.092;
   frame.add(photo);
 
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(size.width, size.height), pictureGlassMat);
-  glass.position.z = 0.116;
+  glass.position.z = 0.112;
   frame.add(glass);
 
   const catchlight = new THREE.Mesh(
@@ -349,13 +437,18 @@ function addCorridorPhoto(
       depthWrite: false,
     }),
   );
-  catchlight.position.set(-size.width * 0.25, 0, 0.122);
+  catchlight.position.set(-size.width * 0.25, 0, 0.119);
   catchlight.rotation.z = -0.18;
   frame.add(catchlight);
 
+  addCorridorFrameRails(frame, maxW, maxH, 0.072, 0.08, frameMat, 0.084);
+  addCorridorFrameRails(frame, maxW, maxH, 0.018, 0.03, linerMat, 0.116);
+
   frame.position.set(x, y, z);
   frame.rotation.y = rotY;
+  frame.userData = makeCorridorPhotoUserData(asset, accent);
   group.add(frame);
+  frameMeshes.push(frame);
 }
 
 function addRoomDetails(group: THREE.Group, rm: RoomData, ri: number): void {
@@ -416,8 +509,8 @@ function addCorridor(conn: Connection): void {
       group.add(wall);
       occluderMeshes.push(wall);
     });
-    addCorridorPhoto(group, 'family-group', x - CORRIDOR_W / 2 + 0.045, 1.78, zc - len * 0.18, Math.PI / 2, 1.2, 1.45, '#4f7bd9');
-    addCorridorPhoto(group, 'ti-leadership-meeting', x + CORRIDOR_W / 2 - 0.045, 1.78, zc + len * 0.18, -Math.PI / 2, 1.35, 1.05, '#c9a96e');
+    addCorridorPhoto(group, 'meeting-458-guest-introduction', x - CORRIDOR_W / 2 + 0.045, 1.78, zc - len * 0.18, Math.PI / 2, 1.2, 0.92, '#c9a96e');
+    addCorridorPhoto(group, 'meeting-455-about-childhood', x + CORRIDOR_W / 2 - 0.045, 1.78, zc + len * 0.18, -Math.PI / 2, 1.35, 1.05, '#c9a96e');
   } else {
     const len = Math.abs(a.x - b.x);
     const xc = (a.x + b.x) / 2;

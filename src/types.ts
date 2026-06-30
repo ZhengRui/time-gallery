@@ -1,10 +1,11 @@
 export type WallSide = 'front' | 'back' | 'left' | 'right';
 export type Axis = 'x' | 'z';
 export type Accent = [number, number, number];
-export type ExhibitKind = 'photo' | 'poster' | 'data' | 'keyword' | 'timeline' | 'map' | 'qr' | 'slogan';
+export type ExhibitKind = 'photo' | 'poster' | 'data' | 'keyword' | 'timeline' | 'map' | 'qr' | 'slogan' | 'circle-photo';
 export type AssetKind = 'photo' | 'poster' | 'graphic' | 'qr' | 'logo';
 export type AssetRole =
   | 'toastmasters-scale'
+  | 'ordinary-photo'
   | 'network'
   | 'public-speaking'
   | 'leadership'
