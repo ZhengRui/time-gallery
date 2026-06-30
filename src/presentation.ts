@@ -30,6 +30,9 @@ const cueCount = CLUB_INTRO_PRESENTATION_CUES.length;
 const groupTitleMap = new Map(
   CLUB_INTRO_PRESENTATION_GROUPS.map(group => [group.id, group.title] as const),
 );
+const groupRoomMap = new Map(
+  CLUB_INTRO_PRESENTATION_GROUPS.map(group => [group.id, group.roomIdx] as const),
+);
 
 const startPosition = new THREE.Vector3();
 const endPosition = new THREE.Vector3();
@@ -38,6 +41,57 @@ const endLookAt = new THREE.Vector3();
 const currentLookAt = new THREE.Vector3();
 const cameraDirection = new THREE.Vector3();
 
+type CameraRoutePoint = {
+  position: [number, number, number];
+  lookAt: [number, number, number];
+  durationMs: number;
+};
+
+const room0ToRoom1Route: CameraRoutePoint[] = [
+  {
+    position: [0, 1.62, -8.35],
+    lookAt: [0, 1.56, -11.3],
+    durationMs: 1200,
+  },
+  {
+    position: [0, 1.62, -15.85],
+    lookAt: [0, 1.56, -17.1],
+    durationMs: 2000,
+  },
+  {
+    position: [-2.25, 1.62, -17.9],
+    lookAt: [-5.2, 1.66, -18.45],
+    durationMs: 950,
+  },
+  {
+    position: [-3.2, 1.66, -18.45],
+    lookAt: [-6.4, 1.9, -18.55],
+    durationMs: 540,
+  },
+];
+
+const room1ToRoom0Route: CameraRoutePoint[] = [
+  {
+    position: [0, 1.62, -18.45],
+    lookAt: [0, 1.56, -15.75],
+    durationMs: 1200,
+  },
+  {
+    position: [0, 1.62, -8.35],
+    lookAt: [0, 1.56, -7.0],
+    durationMs: 2000,
+  },
+  {
+    position: [-2.7, 1.65, -8.25],
+    lookAt: [-6.0, 1.9, -8.25],
+    durationMs: 980,
+  },
+];
+
+const INTER_ROOM_FINAL_SETTLE_MS = 520;
+const routePositions: THREE.Vector3[] = [];
+const routeLookAts: THREE.Vector3[] = [];
+const routeDurations: number[] = [];
 let active = false;
 let currentIndex = -1;
 let isCameraMoving = false;
@@ -82,15 +136,76 @@ function currentCameraLookAt(): THREE.Vector3 {
   return startLookAt.copy(camera.position).addScaledVector(cameraDirection, 4);
 }
 
-function startCameraMove(cue: PresentationCue, onArrive?: () => void): void {
+function getInterRoomRoute(previousCue: PresentationCue | null, cue: PresentationCue): CameraRoutePoint[] {
+  if (!previousCue || previousCue.groupId === cue.groupId) return [];
+
+  const fromRoom = groupRoomMap.get(previousCue.groupId);
+  const toRoom = groupRoomMap.get(cue.groupId);
+  if (fromRoom === 0 && toRoom === 1) return room0ToRoom1Route;
+  if (fromRoom === 1 && toRoom === 0) return room1ToRoom0Route;
+  return [];
+}
+
+function clearCameraRoute(): void {
+  routePositions.length = 0;
+  routeLookAts.length = 0;
+  routeDurations.length = 0;
+}
+
+function queueCameraRoutePoint(point: CameraRoutePoint): void {
+  routePositions.push(new THREE.Vector3().fromArray(point.position));
+  routeLookAts.push(new THREE.Vector3().fromArray(point.lookAt));
+  routeDurations.push(point.durationMs);
+  transitionDurationMs += point.durationMs;
+}
+
+function sampleCameraRoute(elapsedMs: number): void {
+  let segmentStartMs = 0;
+  for (let index = 0; index < routeDurations.length; index += 1) {
+    const durationMs = Math.max(1, routeDurations[index]);
+    const segmentEndMs = segmentStartMs + durationMs;
+    if (elapsedMs <= segmentEndMs || index === routeDurations.length - 1) {
+      const t = clamp((elapsedMs - segmentStartMs) / durationMs, 0, 1);
+      camera.position.lerpVectors(routePositions[index], routePositions[index + 1], t);
+      currentLookAt.lerpVectors(routeLookAts[index], routeLookAts[index + 1], t);
+      return;
+    }
+    segmentStartMs = segmentEndMs;
+  }
+}
+
+function startCameraMove(
+  cue: PresentationCue,
+  previousCue: PresentationCue | null,
+  onArrive?: () => void,
+): void {
   isCameraMoving = true;
   transitionElapsedMs = 0;
-  transitionDurationMs = cue.camera.durationMs;
+  transitionDurationMs = 0;
+  clearCameraRoute();
   onCameraArrive = onArrive || null;
   startPosition.copy(camera.position);
   startLookAt.copy(currentCameraLookAt());
-  endPosition.fromArray(cue.camera.position);
-  endLookAt.fromArray(cue.camera.lookAt);
+
+  const interRoomRoute = getInterRoomRoute(previousCue, cue);
+  if (interRoomRoute.length === 0) {
+    transitionDurationMs = cue.camera.durationMs;
+    endPosition.fromArray(cue.camera.position);
+    endLookAt.fromArray(cue.camera.lookAt);
+    updateNavButtons();
+    return;
+  }
+
+  routePositions.push(startPosition.clone());
+  routeLookAts.push(startLookAt.clone());
+  interRoomRoute.forEach(queueCameraRoutePoint);
+  queueCameraRoutePoint({
+    ...cue.camera,
+    durationMs: INTER_ROOM_FINAL_SETTLE_MS,
+  });
+  endPosition.copy(routePositions[routePositions.length - 1]);
+  endLookAt.copy(routeLookAts[routeLookAts.length - 1]);
+
   updateNavButtons();
 }
 
@@ -100,6 +215,7 @@ function settleCameraMove(): void {
   isCameraMoving = false;
   transitionElapsedMs = 0;
   transitionDurationMs = 0;
+  clearCameraRoute();
 
   const callback = onCameraArrive;
   onCameraArrive = null;
@@ -132,7 +248,7 @@ function goToCue(index: number): void {
 
   if (!previousCue) {
     closeActivePhoto(false);
-    startCameraMove(cue, () => openCue(cue, frameData));
+    startCameraMove(cue, previousCue, () => openCue(cue, frameData));
     return;
   }
 
@@ -144,12 +260,12 @@ function goToCue(index: number): void {
 
   if (isSameGroup) {
     openCue(cue, frameData);
-    startCameraMove(cue);
+    startCameraMove(cue, previousCue);
     return;
   }
 
   closeActivePhoto(false);
-  startCameraMove(cue, () => openCue(cue, frameData));
+  startCameraMove(cue, previousCue, () => openCue(cue, frameData));
 }
 
 function startPresentation(): void {
@@ -174,6 +290,7 @@ function finishPresentation(): void {
   currentIndex = -1;
   isCameraMoving = false;
   onCameraArrive = null;
+  clearCameraRoute();
   hideHud();
   closeActivePhoto(false);
 }
@@ -188,6 +305,7 @@ function activatePresentationAtCue(index: number): void {
   transitionElapsedMs = 0;
   transitionDurationMs = 0;
   onCameraArrive = null;
+  clearCameraRoute();
   showHud(cue);
 }
 
@@ -204,9 +322,13 @@ export function updatePresentation(dt: number): boolean {
 
   if (transitionElapsedMs < transitionDurationMs) {
     transitionElapsedMs = Math.min(transitionDurationMs, transitionElapsedMs + dt * 1000);
-    const t = transitionDurationMs === 0 ? 1 : easeInOut(transitionElapsedMs / transitionDurationMs);
-    camera.position.lerpVectors(startPosition, endPosition, t);
-    currentLookAt.lerpVectors(startLookAt, endLookAt, t);
+    if (routeDurations.length > 0) {
+      sampleCameraRoute(transitionElapsedMs);
+    } else {
+      const t = transitionDurationMs === 0 ? 1 : easeInOut(transitionElapsedMs / transitionDurationMs);
+      camera.position.lerpVectors(startPosition, endPosition, t);
+      currentLookAt.lerpVectors(startLookAt, endLookAt, t);
+    }
     applyLookAt(camera.position, currentLookAt);
   } else {
     settleCameraMove();
@@ -315,6 +437,7 @@ function handlePhotoClosed(): void {
   currentIndex = -1;
   isCameraMoving = false;
   onCameraArrive = null;
+  clearCameraRoute();
   hideHud();
 }
 
