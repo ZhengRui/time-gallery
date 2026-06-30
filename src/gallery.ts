@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { resolveClubIntroAssetUrl } from './assetUrls';
 import { makeAssetMaterial } from './assets';
 import { CLUB_INTRO_ASSET_MAP, CLUB_INTRO_EXHIBITS } from './clubIntroData';
 import { CONNECTIONS, ROOM_PLAN, ROOMS } from './data';
@@ -332,7 +333,7 @@ function hexHue(accent: string): number {
 }
 
 function makeCorridorPhotoUserData(asset: ClubIntroAsset, accent: string): FrameUserData {
-  const imageSrc = asset.localPath || asset.sourceUrl;
+  const imageSrc = resolveClubIntroAssetUrl(asset);
   const meetingLabel = asset.meetingNo ? `SoarHigh Club Meeting #${asset.meetingNo}` : undefined;
   const context = [meetingLabel, asset.meetingTheme].filter(Boolean).join(': ');
   const desc = [context, asset.caption].filter(Boolean).join('. ');

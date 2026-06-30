@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { resolveClubIntroAssetUrl } from './assetUrls';
 import { canvasContext2d } from './dom';
 import { renderer } from './scene';
 import type { ClubIntroAsset, ExhibitData } from './types';
@@ -306,7 +307,7 @@ export function makeAssetMaterial(asset: ClubIntroAsset, accentHex?: string): TH
     roughness: 0.56,
     metalness: 0,
   });
-  const url = asset.localPath || asset.sourceUrl;
+  const url = resolveClubIntroAssetUrl(asset);
   if (!url) return material;
 
   textureLoader.load(
@@ -391,7 +392,7 @@ export function makeCircleAssetMaterial(asset: ClubIntroAsset, accentHex?: strin
     roughness: 0.52,
     metalness: 0,
   });
-  const url = asset.localPath || asset.sourceUrl;
+  const url = resolveClubIntroAssetUrl(asset);
   if (!url) return material;
 
   textureLoader.load(

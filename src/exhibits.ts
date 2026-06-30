@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { resolveClubIntroAssetUrl } from './assetUrls';
 import { makeAssetMaterial, makeCircleAssetMaterial, makeExhibitTexture } from './assets';
 import {
   makePlaqueTex,
@@ -297,7 +298,7 @@ export function addClubIntroExhibit(
 
   const popupImageAssets = exhibit.kind === 'timeline' || isWallSign ? [] : assets;
   const imageSrcs = popupImageAssets
-    .map(asset => asset.localPath || asset.sourceUrl)
+    .map(resolveClubIntroAssetUrl)
     .filter((src): src is string => !!src);
   const userData: FrameUserData = {
     id: exhibit.id,

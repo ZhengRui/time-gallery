@@ -1,3 +1,4 @@
+import { resolveClubIntroAssetUrl } from './assetUrls';
 import {
   CLUB_INTRO_ASSET_MAP,
   CLUB_INTRO_EXHIBIT_MAP,
@@ -40,7 +41,7 @@ export function frameDataForPresentationCue(cue: PresentationCue): FrameUserData
     .map(id => CLUB_INTRO_ASSET_MAP.get(id))
     .filter(asset => !!asset);
   const imageSrcs = assets
-    .map(asset => asset?.localPath || asset?.sourceUrl)
+    .map(resolveClubIntroAssetUrl)
     .filter((src): src is string => !!src);
 
   return {
