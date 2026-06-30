@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {
   canvasContext2d,
   crosshair,
+  fullscreenToggle,
   hud,
   overlay,
   photoPopup,
@@ -42,6 +43,15 @@ const touchNavigationAvailable =
   hasCoarsePointer || (!hasFinePointer && navigator.maxTouchPoints > 0);
 const pointerTouchEventsAvailable = 'PointerEvent' in window;
 
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+};
+
 renderer.domElement.tabIndex = 0;
 
 function clamp(value: number, min: number, max: number): number {
@@ -76,6 +86,50 @@ function requestPointerLockSafe(): void {
     if (result && 'catch' in result) result.catch(() => {});
   } catch(e) {}
 }
+
+function fullscreenElement(): Element | null {
+  const doc = document as FullscreenDocument;
+  return document.fullscreenElement || doc.webkitFullscreenElement || null;
+}
+
+function updateFullscreenButton(): void {
+  const isFullscreen = !!fullscreenElement();
+  fullscreenToggle.classList.toggle('active', isFullscreen);
+  fullscreenToggle.setAttribute(
+    'aria-label',
+    isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen',
+  );
+  fullscreenToggle.title = isFullscreen ? 'Exit fullscreen' : 'Fullscreen';
+}
+
+async function toggleFullscreen(): Promise<void> {
+  const doc = document as FullscreenDocument;
+  const root = document.documentElement as FullscreenElement;
+  try {
+    if (fullscreenElement()) {
+      const exit = document.exitFullscreen?.bind(document) || doc.webkitExitFullscreen?.bind(doc);
+      await exit?.();
+    } else {
+      const request = root.requestFullscreen?.bind(root) || root.webkitRequestFullscreen?.bind(root);
+      await request?.();
+    }
+  } catch(e) {
+    // Fullscreen can be rejected by the browser outside a direct user gesture.
+  } finally {
+    updateFullscreenButton();
+  }
+}
+
+fullscreenToggle.addEventListener('pointerdown', e => {
+  e.stopPropagation();
+});
+fullscreenToggle.addEventListener('click', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  void toggleFullscreen();
+});
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
 
 function enterGallery(): void {
   hasEntered = true;

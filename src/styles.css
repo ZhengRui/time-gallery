@@ -8,6 +8,13 @@ canvas{display:block;touch-action:none}
 #crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:12px;height:12px;border:2px solid rgba(255,239,188,.92);border-radius:50%;pointer-events:none;z-index:200;box-shadow:0 0 0 2px rgba(0,0,0,.42),0 0 10px rgba(255,224,148,.24);transition:width .18s,height .18s,border-color .18s,box-shadow .18s}
 #crosshair::after{content:'';position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:rgba(255,248,224,.96);box-shadow:0 0 0 1px rgba(0,0,0,.48);transform:translate(-50%,-50%)}
 #crosshair.hit{width:20px;height:20px;border-color:rgba(255,216,120,.98);box-shadow:0 0 0 2px rgba(0,0,0,.48),0 0 16px rgba(255,216,120,.48)}
+.fullscreen-toggle{position:fixed;top:calc(5.8rem + env(safe-area-inset-top));right:calc(2rem + env(safe-area-inset-right));z-index:720;width:2.75rem;height:2.75rem;border:1px solid rgba(248,232,192,.46);border-radius:50%;background:rgba(4,8,10,.5);backdrop-filter:blur(14px);box-shadow:0 12px 34px rgba(0,0,0,.32),inset 0 0 18px rgba(214,186,128,.08);color:#fff0d4;display:grid;place-items:center;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent;transition:transform .16s,border-color .16s,background .16s,box-shadow .16s}
+.fullscreen-toggle svg{grid-area:1/1;width:1.28rem;height:1.28rem;fill:none;stroke:currentColor;stroke-width:2.15;stroke-linecap:round;stroke-linejoin:round}
+.fullscreen-toggle .fullscreen-exit-icon{display:none}
+.fullscreen-toggle.active .fullscreen-enter-icon{display:none}
+.fullscreen-toggle.active .fullscreen-exit-icon{display:block}
+.fullscreen-toggle:hover{border-color:rgba(255,239,188,.78);background:rgba(12,20,22,.66);transform:scale(1.04)}
+.fullscreen-toggle:active{transform:scale(.97)}
 
 #loader{position:fixed;inset:0;background:#060606;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1s}
 #loader.fade{opacity:0;pointer-events:none}
@@ -85,6 +92,7 @@ canvas{display:block;touch-action:none}
   .touch-help{display:inline}
   #hud{padding:1rem 1.2rem}
   .room-label h3{font-size:1.05rem}
+  .fullscreen-toggle{top:calc(5.65rem + env(safe-area-inset-top));right:calc(1.2rem + env(safe-area-inset-right))}
   #minimap{width:140px;height:126px;right:1rem;bottom:1rem}
   #presentation-hud{left:1rem;right:1rem;bottom:1rem;justify-content:center}
   .presentation-nav-btn{width:3.45rem;height:3.45rem}

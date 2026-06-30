@@ -14,6 +14,7 @@ export const loader = byId<HTMLDivElement>('loader');
 export const overlay = byId<HTMLDivElement>('overlay');
 export const hud = byId<HTMLDivElement>('hud');
 export const crosshair = byId<HTMLDivElement>('crosshair');
+export const fullscreenToggle = byId<HTMLButtonElement>('fullscreen-toggle');
 export const roomLabelName = byId<HTMLHeadingElement>('rl-name');
 export const roomLabelSub = byId<HTMLParagraphElement>('rl-sub');
 export const presentationHud = byId<HTMLDivElement>('presentation-hud');
